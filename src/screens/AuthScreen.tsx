@@ -69,7 +69,7 @@ const AuthScreen = () => {
         ),
       ),
     ]).start();
-  }, []);
+  }, [buttonScale, fadeAnim, featureAnims, slideAnim]);
 
   const handleGoogleSignIn = async () => {
     try {
@@ -113,7 +113,7 @@ const AuthScreen = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.bgDark} />
+      <StatusBar barStyle="light-content" />
       <LinearGradient
         colors={[COLORS.bgDark, '#0F1329', '#141833']}
         style={styles.gradient}>

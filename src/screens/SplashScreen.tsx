@@ -94,11 +94,20 @@ const SplashScreen = ({onFinish}: {onFinish: () => void}) => {
         }),
       ]),
     ).start();
-  }, []);
+  }, [
+    glowOpacity,
+    logoOpacity,
+    logoScale,
+    onFinish,
+    pulseAnim,
+    subtitleOpacity,
+    titleOpacity,
+    titleTranslateY,
+  ]);
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.bgDark} />
+      <StatusBar barStyle="light-content" />
       <LinearGradient
         colors={[COLORS.bgDark, '#0F1329', '#141833']}
         style={styles.gradient}>

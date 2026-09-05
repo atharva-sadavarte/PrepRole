@@ -1,4 +1,4 @@
-import React, {useRef, useEffect} from 'react';
+import React, {useRef, useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -14,15 +14,19 @@ import LinearGradient from 'react-native-linear-gradient';
 import {GoogleSignin} from '@react-native-google-signin/google-signin';
 import {supabase} from '../lib/supabase';
 import {COLORS, SPACING, RADIUS} from '../lib/theme';
+import {getUserAnalyses} from '../services/resumeService';
+import {ResumeAnalysisRecord} from '../types/resume';
 import type {Session} from '@supabase/supabase-js';
 
 const {width} = Dimensions.get('window');
 
 interface DashboardScreenProps {
   session: Session;
+  navigation: any;
 }
 
-const DashboardScreen = ({session}: DashboardScreenProps) => {
+const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
+  const [recentScans, setRecentScans] = useState<ResumeAnalysisRecord[]>([]);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const cardAnims = useRef([
@@ -39,6 +43,16 @@ const DashboardScreen = ({session}: DashboardScreenProps) => {
   const userEmail = user.email;
 
   useEffect(() => {
+    const fetchScans = async () => {
+      try {
+        const scans = await getUserAnalyses(session.user.id);
+        setRecentScans(scans.slice(0, 3));
+      } catch (err) {
+        console.error('Error fetching dashboard scans:', err);
+      }
+    };
+    fetchScans();
+
     Animated.sequence([
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -64,12 +78,12 @@ const DashboardScreen = ({session}: DashboardScreenProps) => {
         ),
       ),
     ]).start();
-  }, []);
+  }, [session.user.id, fadeAnim, slideAnim, cardAnims]);
 
   const handleSignOut = async () => {
     try {
       await GoogleSignin.signOut();
-    } catch (e) {
+    } catch {
       // Google sign out may fail if not signed in via Google
     }
     await supabase.auth.signOut();
@@ -80,6 +94,21 @@ const DashboardScreen = ({session}: DashboardScreenProps) => {
     if (hour < 12) return 'Good Morning';
     if (hour < 17) return 'Good Afternoon';
     return 'Good Evening';
+  };
+
+  const handleActionPress = (index: number) => {
+    if (index === 0) {
+      // Upload CV
+      navigation.navigate('CVUpload');
+    } else if (index === 2) {
+      // My Scores
+      navigation.navigate('ScoreHistory');
+    } else if (index === 1) {
+      // Mock Interview
+      navigation.navigate('CVUpload');
+    } else {
+      navigation.navigate('ScoreHistory');
+    }
   };
 
   const quickActions = [
@@ -109,18 +138,18 @@ const DashboardScreen = ({session}: DashboardScreenProps) => {
     },
   ];
 
-  const recentActivity = [
-    {
-      icon: '🔥',
-      title: 'No activity yet',
-      desc: 'Upload your first CV to get started!',
-      time: '',
-    },
-  ];
+  const formatDate = (isoString?: string) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    return date.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+    });
+  };
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.bgDark} />
+      <StatusBar barStyle="light-content" />
       <LinearGradient
         colors={[COLORS.bgDark, '#0F1329', '#141833']}
         style={styles.gradient}>
@@ -157,7 +186,7 @@ const DashboardScreen = ({session}: DashboardScreenProps) => {
               </TouchableOpacity>
             </View>
 
-            {/* Stats Card */}
+            {/* Stats Hero Card */}
             <LinearGradient
               colors={[COLORS.primaryStart, COLORS.primaryEnd]}
               style={styles.statsCard}
@@ -167,10 +196,12 @@ const DashboardScreen = ({session}: DashboardScreenProps) => {
                 <View style={styles.statsContent}>
                   <Text style={styles.statsTitle}>Ready to level up?</Text>
                   <Text style={styles.statsSubtitle}>
-                    Upload your CV and start preparing for your dream role
+                    Upload your CV and get an AI score & actionable recommendations
                   </Text>
-                  <TouchableOpacity style={styles.statsButton}>
-                    <Text style={styles.statsButtonText}>Get Started →</Text>
+                  <TouchableOpacity
+                    style={styles.statsButton}
+                    onPress={() => navigation.navigate('CVUpload')}>
+                    <Text style={styles.statsButtonText}>Scan My CV →</Text>
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.statsBigEmoji}>🚀</Text>
@@ -201,7 +232,8 @@ const DashboardScreen = ({session}: DashboardScreenProps) => {
                   ]}>
                   <TouchableOpacity
                     style={styles.actionCard}
-                    activeOpacity={0.8}>
+                    activeOpacity={0.8}
+                    onPress={() => handleActionPress(index)}>
                     <LinearGradient
                       colors={action.gradient}
                       style={styles.actionIconBg}
@@ -219,28 +251,68 @@ const DashboardScreen = ({session}: DashboardScreenProps) => {
 
           {/* Recent Activity */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Recent Activity</Text>
-            {recentActivity.map((item, index) => (
-              <View key={index} style={styles.activityItem}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Recent Activity</Text>
+              {recentScans.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('ScoreHistory')}>
+                  <Text style={styles.seeAllText}>See All →</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {recentScans.length > 0 ? (
+              recentScans.map(scan => (
+                <TouchableOpacity
+                  key={scan.id}
+                  style={styles.activityItem}
+                  activeOpacity={0.8}
+                  onPress={() =>
+                    navigation.navigate('CVScoreResult', {analysis: scan})
+                  }>
+                  <View style={styles.activityScoreBadge}>
+                    <Text style={styles.activityScoreText}>
+                      {scan.overall_score}
+                    </Text>
+                  </View>
+                  <View style={styles.activityText}>
+                    <Text style={styles.activityTitle} numberOfLines={1}>
+                      {scan.target_role}
+                    </Text>
+                    <Text style={styles.activityDesc} numberOfLines={1}>
+                      {scan.score_tier} • {scan.improvements?.length || 0}{' '}
+                      recommendations
+                    </Text>
+                  </View>
+                  <Text style={styles.activityTime}>
+                    {formatDate(scan.created_at)}
+                  </Text>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <TouchableOpacity
+                style={styles.activityItem}
+                onPress={() => navigation.navigate('CVUpload')}>
                 <View style={styles.activityIcon}>
-                  <Text style={styles.activityEmoji}>{item.icon}</Text>
+                  <Text style={styles.activityEmoji}>🔥</Text>
                 </View>
                 <View style={styles.activityText}>
-                  <Text style={styles.activityTitle}>{item.title}</Text>
-                  <Text style={styles.activityDesc}>{item.desc}</Text>
+                  <Text style={styles.activityTitle}>No CV analyzed yet</Text>
+                  <Text style={styles.activityDesc}>
+                    Upload your first CV to get scored!
+                  </Text>
                 </View>
-                {item.time ? (
-                  <Text style={styles.activityTime}>{item.time}</Text>
-                ) : null}
-              </View>
-            ))}
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Profile info */}
           <View style={[styles.section, styles.profileSection]}>
             <View style={styles.profileInfo}>
               <Text style={styles.profileLabel}>Signed in as</Text>
-              <Text style={styles.profileEmail}>{userEmail}</Text>
+              <Text style={styles.profileEmail} numberOfLines={1}>
+                {userEmail}
+              </Text>
             </View>
             <TouchableOpacity
               onPress={handleSignOut}
@@ -358,11 +430,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     marginTop: SPACING.xl,
   },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: COLORS.textPrimary,
     marginBottom: SPACING.md,
+  },
+  seeAllText: {
+    color: COLORS.accent,
+    fontSize: 13,
+    fontWeight: '600',
   },
   actionsGrid: {
     flexDirection: 'row',
@@ -421,6 +504,21 @@ const styles = StyleSheet.create({
   activityEmoji: {
     fontSize: 20,
   },
+  activityScoreBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: RADIUS.md,
+    backgroundColor: 'rgba(0, 210, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  activityScoreText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.accent,
+  },
   activityText: {
     marginLeft: SPACING.md,
     flex: 1,
@@ -441,7 +539,6 @@ const styles = StyleSheet.create({
   },
   profileSection: {
     backgroundColor: COLORS.bgCard,
-    marginHorizontal: SPACING.lg,
     borderRadius: RADIUS.lg,
     padding: SPACING.md,
     borderWidth: 1,
@@ -449,9 +546,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: SPACING.xl,
+    marginBottom: SPACING.xl,
   },
   profileInfo: {
     flex: 1,
+    marginRight: SPACING.md,
   },
   profileLabel: {
     fontSize: 11,
