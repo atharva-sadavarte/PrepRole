@@ -98,6 +98,41 @@ export async function deleteAnalysis(id: string): Promise<boolean> {
 }
 
 /**
+ * Uploads a physical resume file to Supabase Storage bucket 'resumes'
+ */
+export async function uploadResumeFile(
+  userId: string,
+  fileUri: string,
+  fileName: string,
+  contentType: string = 'application/pdf',
+): Promise<{path: string} | null> {
+  try {
+    const cleanFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `${userId}/${Date.now()}_${cleanFileName}`;
+
+    const response = await fetch(fileUri);
+    const blob = await response.blob();
+
+    const {data, error} = await supabase.storage
+      .from('resumes')
+      .upload(filePath, blob, {
+        contentType: contentType || 'application/pdf',
+        upsert: true,
+      });
+
+    if (error) {
+      console.error('Supabase storage upload error:', error);
+      return null;
+    }
+
+    return {path: data.path};
+  } catch (err) {
+    console.error('Failed to upload file to storage:', err);
+    return null;
+  }
+}
+
+/**
  * Sample resume text for 1-tap testing
  */
 export const SAMPLE_RESUME_TEXT = `

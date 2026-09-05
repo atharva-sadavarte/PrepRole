@@ -17,7 +17,11 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import {COLORS, RADIUS, SPACING} from '../lib/theme';
 import {analyzeCVWithAI} from '../services/aiService';
-import {saveAnalysis, SAMPLE_RESUME_TEXT} from '../services/resumeService';
+import {
+  saveAnalysis,
+  uploadResumeFile,
+  SAMPLE_RESUME_TEXT,
+} from '../services/resumeService';
 import type {Session} from '@supabase/supabase-js';
 
 interface CVUploadScreenProps {
@@ -197,11 +201,26 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
         jobDescription: jobDescription.trim() || undefined,
       });
 
+      // Upload physical document to Supabase Storage if picked
+      let uploadedFilePath: string | undefined;
+      if (selectedFile) {
+        const uploadRes = await uploadResumeFile(
+          session.user.id,
+          selectedFile.uri,
+          selectedFile.name,
+          selectedFile.type,
+        );
+        if (uploadRes?.path) {
+          uploadedFilePath = uploadRes.path;
+        }
+      }
+
       // Save to Supabase DB
       const savedRecord = await saveAnalysis(
         session.user.id,
         result,
         selectedFile?.name || 'Pasted Resume',
+        uploadedFilePath,
       );
 
       setLoading(false);
