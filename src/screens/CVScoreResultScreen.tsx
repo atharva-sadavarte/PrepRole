@@ -14,6 +14,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import {COLORS, RADIUS, SPACING} from '../lib/theme';
 import {ScoreGauge} from '../components/ScoreGauge';
 import {RecommendationCard} from '../components/RecommendationCard';
+import {openResumeInViewer} from '../services/resumeService';
 import {ResumeAnalysisRecord, PriorityLevel} from '../types/resume';
 
 interface CVScoreResultScreenProps {
@@ -89,7 +90,17 @@ export const CVScoreResultScreen: React.FC<CVScoreResultScreenProps> = ({
             <Text style={styles.roleLabel}>ANALYSIS FOR TARGET ROLE</Text>
             <Text style={styles.roleTitle}>{analysis.target_role}</Text>
             {analysis.file_name && (
-              <Text style={styles.fileSub}>Source: {analysis.file_name}</Text>
+              <View style={styles.sourceContainer}>
+                <Text style={styles.fileSub}>Source: {analysis.file_name}</Text>
+                {analysis.file_url ? (
+                  <TouchableOpacity
+                    onPress={() => openResumeInViewer(analysis.file_url!)}
+                    style={styles.previewBadgeBtn}
+                    activeOpacity={0.7}>
+                    <Text style={styles.previewBadgeText}>👁️ View PDF ↗</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
             )}
           </View>
 
@@ -321,6 +332,17 @@ export const CVScoreResultScreen: React.FC<CVScoreResultScreenProps> = ({
 
           {/* Bottom Actions */}
           <View style={styles.bottomActions}>
+            {analysis.file_url ? (
+              <TouchableOpacity
+                onPress={() => openResumeInViewer(analysis.file_url!)}
+                style={styles.viewDocBtn}
+                activeOpacity={0.8}>
+                <Text style={styles.viewDocBtnText}>
+                  👁️ View Uploaded Resume (PDF) ↗
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+
             <TouchableOpacity
               onPress={() => navigation.navigate('CVUpload')}
               style={styles.rescanButton}
@@ -417,7 +439,26 @@ const styles = StyleSheet.create({
   fileSub: {
     fontSize: 12,
     color: COLORS.textSecondary,
-    marginTop: 2,
+  },
+  sourceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  previewBadgeBtn: {
+    backgroundColor: 'rgba(0, 210, 255, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+  },
+  previewBadgeText: {
+    color: COLORS.accent,
+    fontSize: 11,
+    fontWeight: '700',
   },
   heroCard: {
     backgroundColor: COLORS.bgCard,
@@ -658,6 +699,19 @@ const styles = StyleSheet.create({
   bottomActions: {
     marginTop: SPACING.md,
     gap: SPACING.sm,
+  },
+  viewDocBtn: {
+    backgroundColor: 'rgba(0, 210, 255, 0.12)',
+    paddingVertical: 14,
+    borderRadius: RADIUS.lg,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+  },
+  viewDocBtnText: {
+    color: COLORS.accent,
+    fontSize: 14,
+    fontWeight: '700',
   },
   rescanButton: {
     backgroundColor: COLORS.bgCardLight,

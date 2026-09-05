@@ -1,3 +1,4 @@
+import {Linking, Alert} from 'react-native';
 import {supabase} from '../lib/supabase';
 import {CVAnalysisResult, ResumeAnalysisRecord} from '../types/resume';
 
@@ -129,6 +130,64 @@ export async function uploadResumeFile(
   } catch (err) {
     console.error('Failed to upload file to storage:', err);
     return null;
+  }
+}
+
+/**
+ * Generates a temporary signed URL to preview or download a resume
+ */
+export async function getResumeSignedUrl(
+  filePath: string,
+  expiresInSeconds: number = 3600,
+): Promise<string | null> {
+  try {
+    const {data, error} = await supabase.storage
+      .from('resumes')
+      .createSignedUrl(filePath, expiresInSeconds);
+
+    if (error || !data?.signedUrl) {
+      console.error('Error creating signed URL:', error);
+      return null;
+    }
+
+    return data.signedUrl;
+  } catch (err) {
+    console.error('Failed to get signed URL:', err);
+    return null;
+  }
+}
+
+/**
+ * Opens a resume file in the system PDF viewer or browser
+ */
+export async function openResumeInViewer(
+  fileUrlOrPath: string,
+): Promise<boolean> {
+  try {
+    let targetUrl = fileUrlOrPath;
+
+    // If it's a Supabase storage path, generate a signed URL
+    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+      const signed = await getResumeSignedUrl(targetUrl);
+      if (!signed) {
+        Alert.alert(
+          'Document Not Found',
+          'Could not retrieve document from storage.',
+        );
+        return false;
+      }
+      targetUrl = signed;
+    }
+
+    await Linking.openURL(targetUrl);
+    return true;
+  } catch (err) {
+    console.error('Error opening resume document:', err);
+    Alert.alert(
+      'Cannot Open Document',
+      'Could not open document viewer on your device.',
+    );
+    return false;
   }
 }
 

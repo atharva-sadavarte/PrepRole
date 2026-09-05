@@ -20,6 +20,7 @@ import {analyzeCVWithAI} from '../services/aiService';
 import {
   saveAnalysis,
   uploadResumeFile,
+  openResumeInViewer,
   SAMPLE_RESUME_TEXT,
 } from '../services/resumeService';
 import type {Session} from '@supabase/supabase-js';
@@ -62,6 +63,7 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
     size?: number;
     type?: string;
   } | null>(null);
+  const [previewing, setPreviewing] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
@@ -152,6 +154,29 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
           'Please switch to the "Paste Text" tab or load the Demo CV to continue testing.',
         );
       }
+    }
+  };
+
+  const handlePreviewSelectedFile = async () => {
+    if (!selectedFile) return;
+    setPreviewing(true);
+    try {
+      const uploadRes = await uploadResumeFile(
+        session.user.id,
+        selectedFile.uri,
+        selectedFile.name,
+        selectedFile.type,
+      );
+      if (uploadRes?.path) {
+        await openResumeInViewer(uploadRes.path);
+      } else {
+        Alert.alert('Preview Notice', 'Could not open document preview.');
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Preview Error', 'Failed to open document preview.');
+    } finally {
+      setPreviewing(false);
     }
   };
 
@@ -395,6 +420,17 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
                             : 'Ready to analyze'}
                         </Text>
                       </View>
+                      <TouchableOpacity
+                        onPress={handlePreviewSelectedFile}
+                        disabled={previewing}
+                        style={styles.filePreviewBtn}
+                        activeOpacity={0.7}>
+                        {previewing ? (
+                          <ActivityIndicator size="small" color={COLORS.accent} />
+                        ) : (
+                          <Text style={styles.filePreviewText}>👁️ Preview</Text>
+                        )}
+                      </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => setSelectedFile(null)}
                         style={styles.fileRemoveBtn}>
@@ -766,6 +802,22 @@ const styles = StyleSheet.create({
   fileRemoveText: {
     color: COLORS.error,
     fontSize: 16,
+    fontWeight: '700',
+  },
+  filePreviewBtn: {
+    backgroundColor: 'rgba(0, 210, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: RADIUS.md,
+    marginRight: SPACING.xs,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filePreviewText: {
+    color: COLORS.accent,
+    fontSize: 12,
     fontWeight: '700',
   },
   pasteArea: {

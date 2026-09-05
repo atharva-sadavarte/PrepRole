@@ -12,7 +12,11 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {COLORS, RADIUS, SPACING} from '../lib/theme';
-import {getUserAnalyses, deleteAnalysis} from '../services/resumeService';
+import {
+  getUserAnalyses,
+  deleteAnalysis,
+  openResumeInViewer,
+} from '../services/resumeService';
 import {ResumeAnalysisRecord} from '../types/resume';
 import type {Session} from '@supabase/supabase-js';
 
@@ -125,11 +129,20 @@ export const ScoreHistoryScreen: React.FC<ScoreHistoryScreenProps> = ({
               🛠️ Skills: {item.breakdown?.skills || 0}%
             </Text>
           </View>
-          <TouchableOpacity
-            onPress={() => handleDelete(item.id, item.target_role)}
-            style={styles.deleteBtn}>
-            <Text style={styles.deleteBtnText}>🗑️</Text>
-          </TouchableOpacity>
+          <View style={styles.cardActionsRow}>
+            {item.file_url ? (
+              <TouchableOpacity
+                onPress={() => openResumeInViewer(item.file_url!)}
+                style={styles.historyPdfBtn}>
+                <Text style={styles.historyPdfBtnText}>👁️ PDF</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity
+              onPress={() => handleDelete(item.id, item.target_role)}
+              style={styles.deleteBtn}>
+              <Text style={styles.deleteBtnText}>🗑️</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -322,6 +335,24 @@ const styles = StyleSheet.create({
   statTag: {
     fontSize: 11,
     color: COLORS.textMuted,
+  },
+  cardActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  historyPdfBtn: {
+    backgroundColor: 'rgba(0, 210, 255, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+  },
+  historyPdfBtnText: {
+    color: COLORS.accent,
+    fontSize: 11,
+    fontWeight: '700',
   },
   deleteBtn: {
     padding: 4,
