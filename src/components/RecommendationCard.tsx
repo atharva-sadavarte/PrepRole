@@ -8,8 +8,10 @@ import {
   Platform,
   UIManager,
 } from 'react-native';
-import {COLORS, RADIUS, SPACING} from '../lib/theme';
+import {useTheme} from '../context/ThemeContext';
+import {RADIUS, SPACING, ICON_SIZES, FONTS} from '../lib/theme';
 import {CVImprovement, PriorityLevel} from '../types/resume';
+import Icon from './Icon';
 
 if (
   Platform.OS === 'android' &&
@@ -27,6 +29,7 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
   item,
   onToggleComplete,
 }) => {
+  const {colors, isDark} = useTheme();
   const [expanded, setExpanded] = useState(false);
   const [completed, setCompleted] = useState(item.completed || false);
 
@@ -47,21 +50,21 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
     switch (priority) {
       case 'high':
         return {
-          bg: 'rgba(255, 82, 82, 0.15)',
-          color: '#FF5252',
+          bg: isDark ? 'rgba(194, 89, 83, 0.18)' : 'rgba(186, 74, 68, 0.12)',
+          color: colors.error,
           label: 'CRITICAL FIX',
         };
       case 'medium':
         return {
-          bg: 'rgba(255, 214, 0, 0.15)',
-          color: '#FFD600',
+          bg: isDark ? 'rgba(217, 130, 43, 0.18)' : 'rgba(194, 115, 34, 0.12)',
+          color: colors.warning,
           label: 'RECOMMENDED',
         };
       case 'low':
       default:
         return {
-          bg: 'rgba(0, 230, 118, 0.15)',
-          color: '#00E676',
+          bg: isDark ? 'rgba(91, 130, 102, 0.18)' : 'rgba(74, 124, 89, 0.12)',
+          color: colors.success,
           label: 'POLISH',
         };
     }
@@ -70,7 +73,17 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
   const priorityMeta = getPriorityStyle(item.priority);
 
   return (
-    <View style={[styles.card, completed && styles.cardCompleted]}>
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: colors.bgCard,
+          borderColor: colors.border,
+          shadowColor: colors.cardShadow,
+          elevation: isDark ? 2 : 3,
+        },
+        completed && styles.cardCompleted,
+      ]}>
       {/* Header Row */}
       <View style={styles.headerRow}>
         <View style={styles.badgesRow}>
@@ -83,17 +96,37 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
               {priorityMeta.label}
             </Text>
           </View>
-          <View style={styles.sectionBadge}>
-            <Text style={styles.sectionText}>{item.section}</Text>
+          <View
+            style={[
+              styles.sectionBadge,
+              {
+                backgroundColor: isDark
+                  ? colors.bgCardLight
+                  : 'rgba(36, 35, 33, 0.05)',
+                borderColor: colors.border,
+              },
+            ]}>
+            <Text style={[styles.sectionText, {color: colors.textSecondary}]}>
+              {item.section}
+            </Text>
           </View>
         </View>
 
         {/* Done Checkbox */}
         <TouchableOpacity
           onPress={handleToggleDone}
-          style={[styles.checkbox, completed && styles.checkboxActive]}
-          activeOpacity={0.7}>
-          {completed && <Text style={styles.checkIcon}>✓</Text>}
+          style={[
+            styles.checkbox,
+            {
+              borderColor: completed ? colors.success : colors.border,
+              backgroundColor: completed ? colors.success : 'transparent',
+            },
+          ]}
+          activeOpacity={0.7}
+          accessibilityLabel={completed ? 'Mark incomplete' : 'Mark complete'}>
+          {completed && (
+            <Icon name="checkmark" size={13} color="#FFFFFF" />
+          )}
         </TouchableOpacity>
       </View>
 
@@ -105,13 +138,14 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
         <Text
           style={[
             styles.title,
-            completed && styles.textCrossed,
+            {color: colors.textPrimary},
+            completed && [styles.textCrossed, {color: colors.textMuted}],
           ]}>
           {item.title}
         </Text>
 
         <Text
-          style={styles.description}
+          style={[styles.description, {color: colors.textSecondary}]}
           numberOfLines={expanded ? undefined : 2}>
           {item.description}
         </Text>
@@ -119,12 +153,42 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
 
       {/* Expandable Example / Suggestion Box */}
       {expanded && item.example ? (
-        <View style={styles.exampleBox}>
+        <View
+          style={[
+            styles.exampleBox,
+            {
+              backgroundColor: isDark
+                ? 'rgba(196, 154, 114, 0.08)'
+                : 'rgba(166, 124, 82, 0.06)',
+              borderColor: isDark
+                ? 'rgba(196, 154, 114, 0.22)'
+                : 'rgba(166, 124, 82, 0.2)',
+              borderLeftColor: colors.accent,
+            },
+          ]}>
           <View style={styles.exampleHeader}>
-            <Text style={styles.exampleEmoji}>💡</Text>
-            <Text style={styles.exampleTitle}>Suggested Action / Rewrite</Text>
+            <View
+              style={[
+                styles.exampleIconBadge,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(196, 154, 114, 0.2)'
+                    : 'rgba(166, 124, 82, 0.15)',
+                },
+              ]}>
+              <Icon
+                name="bulb"
+                size={12}
+                color={colors.accent}
+              />
+            </View>
+            <Text style={[styles.exampleTitle, {color: colors.accent}]}>
+              Suggested Action / Rewrite
+            </Text>
           </View>
-          <Text style={styles.exampleText}>{item.example}</Text>
+          <Text style={[styles.exampleText, {color: colors.textPrimary}]}>
+            {item.example}
+          </Text>
         </View>
       ) : null}
 
@@ -133,9 +197,17 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
         onPress={toggleExpand}
         style={styles.footerToggle}
         activeOpacity={0.6}>
-        <Text style={styles.footerToggleText}>
-          {expanded ? 'Show Less ▲' : 'Show Rewrite Example ▼'}
-        </Text>
+        <View style={styles.footerToggleRow}>
+          <Text style={[styles.footerToggleText, {color: colors.accent}]}>
+            {expanded ? 'Show Less' : 'Show Rewrite Example'}
+          </Text>
+          <Icon
+            name={expanded ? 'chevron-up' : 'chevron-down'}
+            size={ICON_SIZES.sm}
+            color={colors.accent}
+            style={{marginLeft: 4}}
+          />
+        </View>
       </TouchableOpacity>
     </View>
   );
@@ -143,16 +215,13 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.bgCard,
     borderRadius: RADIUS.lg,
     padding: SPACING.md,
     marginBottom: SPACING.md,
     borderWidth: 1,
-    borderColor: COLORS.border,
   },
   cardCompleted: {
     opacity: 0.65,
-    borderColor: 'rgba(0, 230, 118, 0.3)',
   },
   headerRow: {
     flexDirection: 'row',
@@ -171,96 +240,89 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
   },
   priorityText: {
+    fontFamily: FONTS.bold,
     fontSize: 10,
-    fontWeight: '800',
     letterSpacing: 0.4,
   },
   sectionBadge: {
-    backgroundColor: COLORS.bgCardLight,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: RADIUS.sm,
+    borderWidth: 1,
   },
   sectionText: {
+    fontFamily: FONTS.semiBold,
     fontSize: 10,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
   },
   checkbox: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: COLORS.textMuted,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  checkboxActive: {
-    backgroundColor: COLORS.success,
-    borderColor: COLORS.success,
-  },
-  checkIcon: {
-    color: '#000',
-    fontSize: 14,
-    fontWeight: '900',
   },
   contentClickable: {
     marginTop: SPACING.xs,
   },
   title: {
+    fontFamily: FONTS.bold,
     fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    lineHeight: 20,
+    lineHeight: 21,
     marginBottom: 4,
   },
   textCrossed: {
     textDecorationLine: 'line-through',
-    color: COLORS.textSecondary,
   },
   description: {
+    fontFamily: FONTS.regular,
     fontSize: 13,
-    color: COLORS.textSecondary,
-    lineHeight: 18,
+    lineHeight: 19,
   },
   exampleBox: {
-    backgroundColor: COLORS.bgInput,
     borderRadius: RADIUS.md,
     padding: SPACING.md,
     marginTop: SPACING.md,
-    borderLeftWidth: 3,
-    borderLeftColor: COLORS.accent,
+    borderWidth: 1,
+    borderLeftWidth: 4,
   },
   exampleHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
-    gap: 6,
+    marginBottom: 6,
   },
-  exampleEmoji: {
-    fontSize: 14,
+  exampleIconBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 6,
   },
   exampleTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.accent,
+    fontFamily: FONTS.bold,
+    fontSize: 11,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   exampleText: {
+    fontFamily: FONTS.mediumItalic,
     fontSize: 12,
-    color: COLORS.textPrimary,
     lineHeight: 18,
-    fontStyle: 'italic',
   },
   footerToggle: {
     alignSelf: 'flex-start',
     marginTop: SPACING.sm,
     paddingTop: 4,
   },
+  footerToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   footerToggleText: {
+    fontFamily: FONTS.semiBold,
     fontSize: 11,
-    fontWeight: '600',
-    color: COLORS.accent,
   },
 });
+
+export default RecommendationCard;

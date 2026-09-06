@@ -15,7 +15,9 @@ import {
   statusCodes,
 } from '@react-native-google-signin/google-signin';
 import {supabase} from '../lib/supabase';
-import {COLORS, SPACING, RADIUS} from '../lib/theme';
+import {useTheme} from '../context/ThemeContext';
+import {COLORS, SPACING, RADIUS, ICON_SIZES, FONTS} from '../lib/theme';
+import Icon from '../components/Icon';
 
 const {width, height} = Dimensions.get('window');
 
@@ -26,6 +28,7 @@ GoogleSignin.configure({
 });
 
 const AuthScreen = () => {
+  const {colors, isDark} = useTheme();
   const [loading, setLoading] = React.useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
@@ -106,20 +109,47 @@ const AuthScreen = () => {
   };
 
   const features = [
-    {icon: '📄', title: 'CV Score', desc: 'Get your resume rated by AI'},
-    {icon: '🎯', title: 'Role Match', desc: 'Match skills to job roles'},
-    {icon: '💬', title: 'Mock Interview', desc: 'Practice with AI interviewer'},
+    {
+      icon: 'document-text-outline',
+      title: 'CV Score',
+      desc: 'Get your resume rated by AI',
+      gradient: [colors.accent, colors.primaryEnd] as string[],
+    },
+    {
+      icon: 'checkmark-done-outline',
+      title: 'Role Match',
+      desc: 'Match skills to job roles',
+      gradient: ['#5B8266', '#4A7C59'] as string[],
+    },
+    {
+      icon: 'chatbubbles-outline',
+      title: 'Mock Interview',
+      desc: 'Practice with AI interviewer',
+      gradient: ['#C27322', '#A35D16'] as string[],
+    },
   ];
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <LinearGradient
-        colors={[COLORS.bgDark, '#0F1329', '#141833']}
+        colors={[colors.bgDark, colors.gradientMiddle, colors.gradientEnd]}
         style={styles.gradient}>
         {/* Decorative elements */}
-        <View style={[styles.decorCircle, styles.decorCircle1]} />
-        <View style={[styles.decorCircle, styles.decorCircle2]} />
+        <View
+          style={[
+            styles.decorCircle,
+            styles.decorCircle1,
+            {backgroundColor: colors.primaryStart},
+          ]}
+        />
+        <View
+          style={[
+            styles.decorCircle,
+            styles.decorCircle2,
+            {backgroundColor: colors.accent},
+          ]}
+        />
 
         {/* Content */}
         <Animated.View
@@ -131,20 +161,25 @@ const AuthScreen = () => {
           <View style={styles.header}>
             <View style={styles.logoRow}>
               <LinearGradient
-                colors={[COLORS.primaryStart, COLORS.primaryEnd]}
+                colors={[colors.primaryStart, colors.primaryEnd]}
                 style={styles.logoSmall}
                 start={{x: 0, y: 0}}
                 end={{x: 1, y: 1}}>
-                <Text style={styles.logoEmoji}>🎯</Text>
+                <Icon name="rocket" size={22} color="#FFFFFF" />
               </LinearGradient>
-              <Text style={styles.logoText}>PrepRole</Text>
+              <Text style={[styles.logoText, {color: colors.textPrimary}]}>
+                PrepRole
+              </Text>
             </View>
 
-            <Text style={styles.heroTitle}>
+            <Text style={[styles.heroTitle, {color: colors.textPrimary}]}>
               Your AI-Powered{'\n'}
-              <Text style={styles.heroHighlight}>Career Coach</Text>
+              <Text style={[styles.heroHighlight, {color: colors.primaryStart}]}>
+                Career Coach
+              </Text>
             </Text>
-            <Text style={styles.heroSubtitle}>
+            <Text
+              style={[styles.heroSubtitle, {color: colors.textSecondary}]}>
               Upload your CV, get scored, and ace your interviews with
               personalized AI preparation.
             </Text>
@@ -158,6 +193,10 @@ const AuthScreen = () => {
                 style={[
                   styles.featureItem,
                   {
+                    backgroundColor: colors.bgCard,
+                    borderColor: colors.border,
+                    shadowColor: colors.cardShadow,
+                    elevation: isDark ? 2 : 4,
                     opacity: featureAnims[index],
                     transform: [
                       {
@@ -169,13 +208,38 @@ const AuthScreen = () => {
                     ],
                   },
                 ]}>
-                <View style={styles.featureIcon}>
-                  <Text style={styles.featureEmoji}>{feature.icon}</Text>
-                </View>
+                <LinearGradient
+                  colors={feature.gradient}
+                  style={styles.featureIcon}
+                  start={{x: 0, y: 0}}
+                  end={{x: 1, y: 1}}>
+                  <Icon
+                    name={feature.icon}
+                    size={ICON_SIZES.lg}
+                    color="#FFFFFF"
+                  />
+                </LinearGradient>
                 <View style={styles.featureText}>
-                  <Text style={styles.featureTitle}>{feature.title}</Text>
-                  <Text style={styles.featureDesc}>{feature.desc}</Text>
+                  <Text
+                    style={[
+                      styles.featureTitle,
+                      {color: colors.textPrimary},
+                    ]}>
+                    {feature.title}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.featureDesc,
+                      {color: colors.textSecondary},
+                    ]}>
+                    {feature.desc}
+                  </Text>
                 </View>
+                <Icon
+                  name="chevron-forward"
+                  size={ICON_SIZES.md}
+                  color={colors.textMuted}
+                />
               </Animated.View>
             ))}
           </View>
@@ -185,17 +249,25 @@ const AuthScreen = () => {
         <Animated.View
           style={[styles.bottomSection, {transform: [{scale: buttonScale}]}]}>
           <TouchableOpacity
-            style={styles.googleButton}
+            style={[
+              styles.googleButton,
+              !isDark && {
+                borderWidth: 1,
+                borderColor: colors.border,
+                shadowColor: colors.cardShadow,
+                elevation: 4,
+              },
+            ]}
             onPress={handleGoogleSignIn}
             disabled={loading}
             activeOpacity={0.85}>
             <LinearGradient
-              colors={['#FFFFFF', '#F5F5F5']}
+              colors={isDark ? ['#FFFFFF', '#F0F0F5'] : ['#FFFFFF', '#F8FAFC']}
               style={styles.googleButtonGradient}
               start={{x: 0, y: 0}}
               end={{x: 0, y: 1}}>
               {loading ? (
-                <ActivityIndicator size="small" color={COLORS.primaryStart} />
+                <ActivityIndicator size="small" color={colors.primaryStart} />
               ) : (
                 <>
                   <Text style={styles.googleIcon}>G</Text>
@@ -207,10 +279,15 @@ const AuthScreen = () => {
             </LinearGradient>
           </TouchableOpacity>
 
-          <Text style={styles.termsText}>
+          <Text style={[styles.termsText, {color: colors.textMuted}]}>
             By continuing, you agree to our{' '}
-            <Text style={styles.termsLink}>Terms</Text> &{' '}
-            <Text style={styles.termsLink}>Privacy Policy</Text>
+            <Text style={[styles.termsLink, {color: colors.primaryStart}]}>
+              Terms
+            </Text>{' '}
+            &{' '}
+            <Text style={[styles.termsLink, {color: colors.primaryStart}]}>
+              Privacy Policy
+            </Text>
           </Text>
         </Animated.View>
       </LinearGradient>
@@ -264,19 +341,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  logoEmoji: {
-    fontSize: 22,
-  },
   logoText: {
+    fontFamily: FONTS.bold,
     fontSize: 22,
-    fontWeight: '700',
     color: COLORS.textPrimary,
     marginLeft: SPACING.sm,
     letterSpacing: 0.5,
   },
   heroTitle: {
+    fontFamily: FONTS.bold,
     fontSize: 34,
-    fontWeight: '800',
     color: COLORS.textPrimary,
     lineHeight: 42,
     marginBottom: SPACING.md,
@@ -285,6 +359,7 @@ const styles = StyleSheet.create({
     color: COLORS.primaryStart,
   },
   heroSubtitle: {
+    fontFamily: FONTS.regular,
     fontSize: 15,
     color: COLORS.textSecondary,
     lineHeight: 22,
@@ -306,24 +381,21 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: RADIUS.md,
-    backgroundColor: COLORS.bgCardLight,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  featureEmoji: {
-    fontSize: 24,
   },
   featureText: {
     marginLeft: SPACING.md,
     flex: 1,
   },
   featureTitle: {
+    fontFamily: FONTS.bold,
     fontSize: 16,
-    fontWeight: '700',
     color: COLORS.textPrimary,
     marginBottom: 2,
   },
   featureDesc: {
+    fontFamily: FONTS.regular,
     fontSize: 13,
     color: COLORS.textSecondary,
   },
@@ -354,11 +426,12 @@ const styles = StyleSheet.create({
     marginRight: SPACING.sm,
   },
   googleButtonText: {
+    fontFamily: FONTS.semiBold,
     fontSize: 16,
-    fontWeight: '600',
     color: '#333333',
   },
   termsText: {
+    fontFamily: FONTS.regular,
     fontSize: 12,
     color: COLORS.textMuted,
     textAlign: 'center',
@@ -366,6 +439,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   termsLink: {
+    fontFamily: FONTS.semiBold,
     color: COLORS.primaryStart,
   },
 });

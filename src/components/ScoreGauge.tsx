@@ -1,7 +1,8 @@
 import React, {useEffect, useRef} from 'react';
 import {View, Text, StyleSheet, Animated} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import {COLORS, RADIUS, SPACING} from '../lib/theme';
+import {useTheme} from '../context/ThemeContext';
+import {COLORS, RADIUS, SPACING, FONTS} from '../lib/theme';
 import {ScoreTier} from '../types/resume';
 
 interface ScoreGaugeProps {
@@ -43,33 +44,35 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
     };
   }, [score, animatedScore, scaleAnim]);
 
+  const {colors: themeColors} = useTheme();
+
   // Determine colors based on score
   const getColors = (): {gradient: string[]; badgeBg: string; text: string} => {
     if (score >= 85) {
       return {
-        gradient: ['#00E676', '#00C853'],
-        badgeBg: 'rgba(0, 230, 118, 0.15)',
-        text: '#00E676',
+        gradient: ['#5B8266', '#4A7C59'],
+        badgeBg: 'rgba(91, 130, 102, 0.15)',
+        text: '#5B8266',
       };
     }
     if (score >= 70) {
       return {
-        gradient: ['#00D2FF', '#0096C7'],
-        badgeBg: 'rgba(0, 210, 255, 0.15)',
-        text: '#00D2FF',
+        gradient: [themeColors.accent, themeColors.primaryEnd],
+        badgeBg: themeColors.accentSoft,
+        text: themeColors.accent,
       };
     }
     if (score >= 50) {
       return {
-        gradient: ['#FFD600', '#FFAB00'],
-        badgeBg: 'rgba(255, 214, 0, 0.15)',
-        text: '#FFD600',
+        gradient: ['#D9822B', '#C27322'],
+        badgeBg: 'rgba(217, 130, 43, 0.15)',
+        text: '#D9822B',
       };
     }
     return {
-      gradient: ['#FF5252', '#D50000'],
-      badgeBg: 'rgba(255, 82, 82, 0.15)',
-      text: '#FF5252',
+      gradient: ['#C25953', '#A84842'],
+      badgeBg: 'rgba(194, 89, 83, 0.15)',
+      text: '#C25953',
     };
   };
 
@@ -98,7 +101,7 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
         ]}
         start={{x: 0, y: 0}}
         end={{x: 1, y: 1}}>
-        {/* Inner Dark Background */}
+        {/* Inner Card Background */}
         <View
           style={[
             styles.innerCircle,
@@ -106,12 +109,15 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
               width: size - 14,
               height: size - 14,
               borderRadius: (size - 14) / 2,
+              backgroundColor: themeColors.bgCard,
             },
           ]}>
           <Text style={[styles.scoreNumber, {color: colors.text}]}>
             {displayScore}
           </Text>
-          <Text style={styles.scoreMax}>out of 100</Text>
+          <Text style={[styles.scoreMax, {color: themeColors.textSecondary}]}>
+            out of 100
+          </Text>
           <View style={[styles.tierBadge, {backgroundColor: colors.badgeBg}]}>
             <Text style={[styles.tierText, {color: colors.text}]}>{tier}</Text>
           </View>
@@ -145,14 +151,14 @@ const styles = StyleSheet.create({
     padding: SPACING.sm,
   },
   scoreNumber: {
+    fontFamily: FONTS.extraBold,
     fontSize: 50,
-    fontWeight: '900',
     letterSpacing: -1,
   },
   scoreMax: {
+    fontFamily: FONTS.medium,
     fontSize: 12,
     color: COLORS.textSecondary,
-    fontWeight: '500',
     marginTop: -4,
   },
   tierBadge: {
@@ -162,8 +168,8 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
   },
   tierText: {
+    fontFamily: FONTS.bold,
     fontSize: 11,
-    fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },

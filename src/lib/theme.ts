@@ -1,43 +1,186 @@
-export const COLORS = {
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  ReactNode,
+} from 'react';
+import {Appearance, ColorSchemeName} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// ─── Color Palettes ────────────────────────────────────────────────
+
+export type ThemeMode = 'dark' | 'light' | 'system';
+
+export interface ColorPalette {
   // Primary gradient
-  primaryStart: '#6C63FF',
-  primaryEnd: '#4834DF',
+  primaryStart: string;
+  primaryEnd: string;
 
   // Accent
-  accent: '#00D2FF',
-  accentLight: '#00E5FF',
+  accent: string;
+  accentLight: string;
+  accentSoft: string;
 
   // Backgrounds
-  bgDark: '#0A0E21',
-  bgCard: '#1A1F38',
-  bgCardLight: '#242942',
-  bgInput: '#1E2340',
+  bgDark: string;
+  bgCard: string;
+  bgCardLight: string;
+  bgInput: string;
 
   // Text
-  textPrimary: '#FFFFFF',
-  textSecondary: '#8E8EA8',
-  textMuted: '#5C5C7A',
+  textPrimary: string;
+  textSecondary: string;
+  textMuted: string;
 
   // Status
-  success: '#00E676',
-  warning: '#FFD600',
-  error: '#FF5252',
+  success: string;
+  warning: string;
+  error: string;
 
   // Borders
-  border: '#2A2F4A',
-  borderLight: '#3A3F5A',
+  border: string;
+  borderLight: string;
 
   // Overlay
-  overlay: 'rgba(10, 14, 33, 0.85)',
+  overlay: string;
+
+  // Extras for gradient backgrounds on screens
+  gradientMiddle: string;
+  gradientEnd: string;
+
+  // Card shadow for light mode
+  cardShadow: string;
+
+  // Status bar style
+  statusBar: 'light-content' | 'dark-content';
+
+  // Whether this is dark mode (for conditional styling)
+  isDark: boolean;
+}
+
+export const DARK_COLORS: ColorPalette = {
+  // Primary brand: Warm Minimalist Accent
+  primaryStart: '#C49A72',
+  primaryEnd: '#A67C52',
+
+  // Accent & Soft Accent
+  accent: '#C49A72',
+  accentLight: '#D9B48F',
+  accentSoft: '#33291F',
+
+  // Backgrounds
+  bgDark: '#121110',
+  bgCard: '#1C1A18',
+  bgCardLight: '#262320',
+  bgInput: '#181614',
+
+  // Text
+  textPrimary: '#F4F1EB',
+  textSecondary: '#A8A39B',
+  textMuted: '#706B63',
+
+  // Status
+  success: '#5B8266',
+  warning: '#D9822B',
+  error: '#C25953',
+
+  // Borders
+  border: '#302D29',
+  borderLight: '#44403B',
+
+  // Overlay
+  overlay: 'rgba(18, 17, 16, 0.90)',
+
+  // Gradient backgrounds
+  gradientMiddle: '#161413',
+  gradientEnd: '#1B1917',
+
+  // Card shadow
+  cardShadow: '#000000',
+
+  statusBar: 'light-content',
+  isDark: true,
 };
 
+export const LIGHT_COLORS: ColorPalette = {
+  // Primary brand: Warm Minimalist Accent
+  primaryStart: '#A67C52',
+  primaryEnd: '#8E653E',
+
+  // Accent & Soft Accent
+  accent: '#A67C52',
+  accentLight: '#BD946C',
+  accentSoft: '#F0E5D8',
+
+  // Backgrounds
+  bgDark: '#FAF9F6',
+  bgCard: '#FFFFFF',
+  bgCardLight: '#F0E5D8',
+  bgInput: '#FFFFFF',
+
+  // Text
+  textPrimary: '#242321',
+  textSecondary: '#77736D',
+  textMuted: '#A39E96',
+
+  // Status
+  success: '#4A7C59',
+  warning: '#C27322',
+  error: '#BA4A44',
+
+  // Borders
+  border: '#E7E3DC',
+  borderLight: '#D8D3C9',
+
+  // Overlay
+  overlay: 'rgba(250, 249, 246, 0.92)',
+
+  // Gradient backgrounds
+  gradientMiddle: '#F5F3EE',
+  gradientEnd: '#EFECE5',
+
+  // Card shadow
+  cardShadow: 'rgba(36, 35, 33, 0.06)',
+
+  statusBar: 'dark-content',
+  isDark: false,
+};
+
+/** Get the active palette based on mode */
+export function getColors(mode: 'dark' | 'light'): ColorPalette {
+  return mode === 'dark' ? DARK_COLORS : LIGHT_COLORS;
+}
+
+/** Resolve system theme to actual mode */
+export function resolveThemeMode(mode: ThemeMode): 'dark' | 'light' {
+  if (mode === 'system') {
+    return Appearance.getColorScheme() === 'light' ? 'light' : 'dark';
+  }
+  return mode;
+}
+
+// ─── Legacy alias for backwards compat during migration ────────────
+export const COLORS = DARK_COLORS;
+
+// ─── Design Tokens (theme-independent) ─────────────────────────────
+
 export const FONTS = {
-  light: 'Inter-Light',
-  regular: 'Inter-Regular',
-  medium: 'Inter-Medium',
-  semiBold: 'Inter-SemiBold',
-  bold: 'Inter-Bold',
-  extraBold: 'Inter-ExtraBold',
+  thin: 'Montserrat-Thin',
+  extraLight: 'Montserrat-ExtraLight',
+  light: 'Montserrat-Light',
+  regular: 'Montserrat-Regular',
+  medium: 'Montserrat-Medium',
+  semiBold: 'Montserrat-SemiBold',
+  bold: 'Montserrat-Bold',
+  extraBold: 'Montserrat-ExtraBold',
+  black: 'Montserrat-Black',
+  italic: 'Montserrat-Italic',
+  mediumItalic: 'Montserrat-MediumItalic',
+  semiBoldItalic: 'Montserrat-SemiBoldItalic',
+  boldItalic: 'Montserrat-BoldItalic',
 };
 
 export const SPACING = {
@@ -56,3 +199,58 @@ export const RADIUS = {
   xl: 24,
   full: 999,
 };
+
+export const ICON_SIZES = {
+  xs: 14,
+  sm: 16,
+  md: 20,
+  lg: 24,
+  xl: 28,
+  xxl: 32,
+  hero: 48,
+};
+
+export const SHADOWS = {
+  card: {
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  elevated: {
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 8},
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  glow: (color: string) => ({
+    shadowColor: color,
+    shadowOffset: {width: 0, height: 0},
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 10,
+  }),
+  button: {
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+};
+
+/** Tab bar constants with default values for backwards compatibility */
+export const TAB_BAR = {
+  height: 60,
+  iconSize: ICON_SIZES.lg,
+  labelSize: 11,
+  backgroundColor: DARK_COLORS.bgCard,
+  borderColor: DARK_COLORS.border,
+  activeColor: DARK_COLORS.primaryStart,
+  inactiveColor: DARK_COLORS.textMuted,
+};
+
+
+

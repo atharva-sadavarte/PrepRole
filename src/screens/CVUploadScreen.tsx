@@ -15,14 +15,17 @@ import {
   NativeModules,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import {COLORS, RADIUS, SPACING} from '../lib/theme';
+import {useTheme} from '../context/ThemeContext';
+import {COLORS, RADIUS, SPACING, ICON_SIZES, FONTS} from '../lib/theme';
 import {analyzeCVWithAI} from '../services/aiService';
 import {
   saveAnalysis,
   uploadResumeFile,
   openResumeInViewer,
-  SAMPLE_RESUME_TEXT,
 } from '../services/resumeService';
+import {getPdfBase64} from '../services/pdfService';
+import Icon from '../components/Icon';
+import PdfPreviewModal from '../components/PdfPreviewModal';
 import type {Session} from '@supabase/supabase-js';
 
 interface CVUploadScreenProps {
@@ -52,6 +55,7 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
   session,
   navigation,
 }) => {
+  const {colors, isDark} = useTheme();
   const [targetRole, setTargetRole] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [showJDInput, setShowJDInput] = useState(false);
@@ -64,6 +68,7 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
     type?: string;
   } | null>(null);
   const [previewing, setPreviewing] = useState(false);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
@@ -114,16 +119,12 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
 
       if (!isAvailable) {
         Alert.alert(
-          'Rebuild Required for Document Picker',
-          'A new native library was added for document picking. To pick files directly from storage, the Android app binary needs to be rebuilt.\n\nIn the meantime, you can easily use the "Paste Text" tab or tap "Demo CV" to test immediately!',
+          'Document Picker Unavailable',
+          'Document picking is not available. Please switch to the "Paste Text" tab to paste your resume content directly.',
           [
             {
               text: 'Switch to Paste Text',
               onPress: () => setActiveTab('paste'),
-            },
-            {
-              text: 'Load Demo CV',
-              onPress: handleLoadSample,
             },
             {text: 'Cancel', style: 'cancel'},
           ],
@@ -151,41 +152,15 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
         console.error('File pick error:', err);
         Alert.alert(
           'File Picker Notice',
-          'Please switch to the "Paste Text" tab or load the Demo CV to continue testing.',
+          'Could not pick file. Please switch to the "Paste Text" tab to paste your resume text.',
         );
       }
     }
   };
 
-  const handlePreviewSelectedFile = async () => {
-    if (!selectedFile) return;
-    setPreviewing(true);
-    try {
-      const uploadRes = await uploadResumeFile(
-        session.user.id,
-        selectedFile.uri,
-        selectedFile.name,
-        selectedFile.type,
-      );
-      if (uploadRes?.path) {
-        await openResumeInViewer(uploadRes.path);
-      } else {
-        Alert.alert('Preview Notice', 'Could not open document preview.');
-      }
-    } catch (err) {
-      console.error(err);
-      Alert.alert('Preview Error', 'Failed to open document preview.');
-    } finally {
-      setPreviewing(false);
-    }
-  };
-
-  const handleLoadSample = () => {
-    setPastedText(SAMPLE_RESUME_TEXT.trim());
-    setActiveTab('paste');
-    if (!targetRole) {
-      setTargetRole('Senior React Native Engineer');
-    }
+  const handlePreviewSelectedFile = () => {
+    if (!selectedFile?.uri) return;
+    setShowPdfPreview(true);
   };
 
   const handleAnalyze = async () => {
@@ -209,14 +184,26 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
     setLoadingStep(0);
 
     try {
-      let cvContent = pastedText.trim();
+      let cvContent = hasPastedText ? pastedText.trim() : undefined;
       let pdfBase64: string | undefined;
 
-      // Note: If a file was picked, on React Native we can pass file information
-      // or fallback to sample/extracted text
-      if (hasFile && !hasPastedText) {
-        // Use file name and simulated rich content if text wasn't pasted
-        cvContent = `[Resume Document: ${selectedFile?.name}]\nTargeted candidate resume for ${targetRole}.\n${SAMPLE_RESUME_TEXT}`;
+      // Extract binary PDF base64 if a file was selected
+      if (hasFile && selectedFile?.uri) {
+        try {
+          pdfBase64 = await getPdfBase64(selectedFile.uri);
+        } catch (readErr: any) {
+          console.error('Failed to read PDF as base64:', readErr);
+        }
+      }
+
+      // If user provided neither readable PDF nor pasted text, notify user
+      if (!cvContent && !pdfBase64) {
+        setLoading(false);
+        Alert.alert(
+          'Resume Unreadable',
+          'Unable to read resume content from the selected file. Please make sure it is a valid PDF document or switch to the "Paste Text" tab.',
+        );
+        return;
       }
 
       const result = await analyzeCVWithAI({
@@ -265,21 +252,96 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <LinearGradient
-        colors={[COLORS.bgDark, '#0F1329', '#141833']}
+        colors={[colors.bgDark, colors.gradientMiddle, colors.gradientEnd]}
         style={styles.gradient}>
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}>
-            <Text style={styles.backText}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>AI CV Analyzer</Text>
-          <TouchableOpacity onPress={handleLoadSample} style={styles.sampleButton}>
-            <Text style={styles.sampleButtonText}>Demo CV</Text>
-          </TouchableOpacity>
+        <View style={[styles.header, {borderBottomColor: colors.border}]}>
+          <View style={styles.headerTopRow}>
+            <View
+              style={[
+                styles.headerBadgePill,
+                {backgroundColor: colors.bgCard, borderColor: colors.border},
+              ]}>
+              <View
+                style={[
+                  styles.headerSparkleBg,
+                  {backgroundColor: colors.accentSoft},
+                ]}>
+                <Icon name="sparkles" size={11} color={colors.accent} />
+              </View>
+              <Text style={[styles.headerBadgeText, {color: colors.textPrimary}]}>
+                AI CV BENCHMARK
+              </Text>
+            </View>
+          </View>
+
+          <Text style={[styles.headerTitle, {color: colors.textPrimary}]}>
+            AI Resume Analyzer
+          </Text>
+          <Text style={[styles.headerSubtitle, {color: colors.textSecondary}]}>
+            Scan resume content against target roles for instant ATS keyword & score evaluation.
+          </Text>
+
+          {/* Stepper bar */}
+          <View style={styles.stepperContainer}>
+            <View style={styles.stepItem}>
+              <View
+                style={[
+                  styles.stepDot,
+                  {backgroundColor: colors.primaryStart},
+                ]}>
+                <Text style={styles.stepDotText}>1</Text>
+              </View>
+              <Text style={[styles.stepItemLabel, {color: colors.textPrimary}]}>
+                Role & JD
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.stepLine,
+                {
+                  backgroundColor:
+                    targetRole.trim().length > 0
+                      ? colors.primaryStart
+                      : colors.border,
+                },
+              ]}
+            />
+            <View style={styles.stepItem}>
+              <View
+                style={[
+                  styles.stepDot,
+                  {
+                    backgroundColor:
+                      (activeTab === 'upload' && selectedFile) ||
+                      (activeTab === 'paste' && pastedText.trim().length > 0)
+                        ? colors.primaryStart
+                        : colors.bgCardLight,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  },
+                ]}>
+                <Text
+                  style={[
+                    styles.stepDotText,
+                    {
+                      color:
+                        (activeTab === 'upload' && selectedFile) ||
+                        (activeTab === 'paste' && pastedText.trim().length > 0)
+                          ? '#FFFFFF'
+                          : colors.textMuted,
+                    },
+                  ]}>
+                  2
+                </Text>
+              </View>
+              <Text style={[styles.stepItemLabel, {color: colors.textSecondary}]}>
+                Resume Content
+              </Text>
+            </View>
+          </View>
         </View>
 
         <ScrollView
@@ -287,39 +349,88 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
           contentContainerStyle={styles.scrollContent}>
           <Animated.View style={{opacity: fadeAnim}}>
             {/* Step 1: Target Role */}
-            <View style={styles.sectionCard}>
+            <View
+              style={[
+                styles.sectionCard,
+                {
+                  backgroundColor: colors.bgCard,
+                  borderColor: colors.border,
+                  shadowColor: colors.cardShadow,
+                  elevation: isDark ? 2 : 4,
+                },
+              ]}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.stepBadge}>1</Text>
-                <Text style={styles.sectionTitle}>Target Job Role</Text>
+                <View style={styles.stepBadgeContainer}>
+                  <LinearGradient
+                    colors={[colors.primaryStart, colors.primaryEnd]}
+                    style={styles.stepBadge}>
+                    <Text style={styles.stepBadgeText}>1</Text>
+                  </LinearGradient>
+                </View>
+                <Text
+                  style={[
+                    styles.sectionTitle,
+                    {color: colors.textPrimary},
+                  ]}>
+                  Target Job Role
+                </Text>
                 <Text style={styles.requiredStar}>*</Text>
               </View>
-              <Text style={styles.sectionSubtitle}>
+              <Text
+                style={[
+                  styles.sectionSubtitle,
+                  {color: colors.textSecondary},
+                ]}>
                 What role are you targeting? AI will benchmark your CV against this.
               </Text>
 
               <TextInput
-                style={styles.textInput}
+                style={[
+                  styles.textInput,
+                  {
+                    backgroundColor: colors.bgInput,
+                    borderColor: colors.border,
+                    color: colors.textPrimary,
+                  },
+                ]}
                 placeholder="e.g. Senior Full Stack Engineer"
-                placeholderTextColor={COLORS.textMuted}
+                placeholderTextColor={colors.textMuted}
                 value={targetRole}
                 onChangeText={setTargetRole}
               />
 
               {/* Quick Role Chips */}
-              <Text style={styles.chipsLabel}>Popular Roles:</Text>
+              <Text
+                style={[
+                  styles.chipsLabel,
+                  {color: colors.textMuted},
+                ]}>
+                Popular Roles:
+              </Text>
               <View style={styles.chipsContainer}>
                 {POPULAR_ROLES.map((role, idx) => (
                   <TouchableOpacity
                     key={idx}
                     style={[
                       styles.roleChip,
-                      targetRole === role && styles.roleChipActive,
+                      {
+                        backgroundColor: colors.bgCardLight,
+                        borderColor: colors.border,
+                      },
+                      targetRole === role && {
+                        backgroundColor: colors.accentSoft,
+                        borderColor: colors.accent,
+                      },
                     ]}
                     onPress={() => setTargetRole(role)}>
                     <Text
                       style={[
                         styles.roleChipText,
-                        targetRole === role && styles.roleChipTextActive,
+                        {color: colors.textSecondary},
+                        targetRole === role && {
+                          color: colors.accent,
+                          fontWeight: '700',
+                        },
                       ]}>
                       {role}
                     </Text>
@@ -329,32 +440,81 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
             </View>
 
             {/* Step 2: Optional Job Description */}
-            <View style={styles.sectionCard}>
+            <View
+              style={[
+                styles.sectionCard,
+                {
+                  backgroundColor: colors.bgCard,
+                  borderColor: colors.border,
+                  shadowColor: colors.cardShadow,
+                  elevation: isDark ? 2 : 4,
+                },
+              ]}>
               <TouchableOpacity
                 onPress={() => setShowJDInput(!showJDInput)}
                 style={styles.accordionHeader}
                 activeOpacity={0.7}>
                 <View style={styles.accordionLeft}>
-                  <Text style={styles.stepBadgeOptional}>2</Text>
+                  <View style={styles.stepBadgeContainer}>
+                    <View
+                      style={[
+                        styles.stepBadgeOptional,
+                        {backgroundColor: colors.bgCardLight},
+                      ]}>
+                      <Text
+                        style={[
+                          styles.stepBadgeOptionalText,
+                          {color: colors.textSecondary},
+                        ]}>
+                        2
+                      </Text>
+                    </View>
+                  </View>
                   <View>
-                    <Text style={styles.sectionTitle}>Job Description</Text>
-                    <Text style={styles.optionalTag}>Optional - Match specific job posting</Text>
+                    <Text
+                      style={[
+                        styles.sectionTitle,
+                        {color: colors.textPrimary},
+                      ]}>
+                      Job Description
+                    </Text>
+                    <Text
+                      style={[
+                        styles.optionalTag,
+                        {color: colors.textMuted},
+                      ]}>
+                      Optional - Match specific job posting
+                    </Text>
                   </View>
                 </View>
-                <Text style={styles.accordionIcon}>
-                  {showJDInput ? '▲' : '▼'}
-                </Text>
+                <Icon
+                  name={showJDInput ? 'chevron-up' : 'chevron-down'}
+                  size={ICON_SIZES.md}
+                  color={colors.textSecondary}
+                />
               </TouchableOpacity>
 
               {showJDInput && (
                 <View style={styles.accordionContent}>
-                  <Text style={styles.sectionSubtitle}>
+                  <Text
+                    style={[
+                      styles.sectionSubtitle,
+                      {color: colors.textSecondary},
+                    ]}>
                     Paste the job description from LinkedIn, Indeed, etc. for laser-focused keyword matching.
                   </Text>
                   <TextInput
-                    style={[styles.textInput, styles.textArea]}
+                    style={[
+                      styles.textInput,
+                      styles.textArea,
+                      {
+                        backgroundColor: colors.bgInput,
+                        borderColor: colors.border,
+                        color: colors.textPrimary,
+                      },
+                    ]}
                     placeholder="Paste the job description, requirements, or responsibilities here..."
-                    placeholderTextColor={COLORS.textMuted}
+                    placeholderTextColor={colors.textMuted}
                     value={jobDescription}
                     onChangeText={setJobDescription}
                     multiline
@@ -366,41 +526,109 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
             </View>
 
             {/* Step 3: CV Source */}
-            <View style={styles.sectionCard}>
+            <View
+              style={[
+                styles.sectionCard,
+                {
+                  backgroundColor: colors.bgCard,
+                  borderColor: colors.border,
+                  shadowColor: colors.cardShadow,
+                  elevation: isDark ? 2 : 4,
+                },
+              ]}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.stepBadge}>3</Text>
-                <Text style={styles.sectionTitle}>Your Resume / CV</Text>
+                <View style={styles.stepBadgeContainer}>
+                  <LinearGradient
+                    colors={[colors.primaryStart, colors.primaryEnd]}
+                    style={styles.stepBadge}>
+                    <Text style={styles.stepBadgeText}>3</Text>
+                  </LinearGradient>
+                </View>
+                <Text
+                  style={[
+                    styles.sectionTitle,
+                    {color: colors.textPrimary},
+                  ]}>
+                  Your Resume / CV
+                </Text>
                 <Text style={styles.requiredStar}>*</Text>
               </View>
 
               {/* Tab Selector */}
-              <View style={styles.tabsContainer}>
+              <View
+                style={[
+                  styles.tabsContainer,
+                  {
+                    backgroundColor: colors.bgInput,
+                    borderColor: colors.border,
+                  },
+                ]}>
                 <TouchableOpacity
                   style={[
                     styles.tabButton,
-                    activeTab === 'upload' && styles.tabButtonActive,
+                    activeTab === 'upload' && [
+                      styles.tabButtonActive,
+                      {
+                        backgroundColor: colors.bgCard,
+                        borderColor: colors.border,
+                      },
+                    ],
                   ]}
                   onPress={() => setActiveTab('upload')}>
+                  <Icon
+                    name="cloud-upload-outline"
+                    size={ICON_SIZES.sm}
+                    color={
+                      activeTab === 'upload'
+                        ? colors.primaryStart
+                        : colors.textSecondary
+                    }
+                    style={{marginRight: 4}}
+                  />
                   <Text
                     style={[
                       styles.tabText,
-                      activeTab === 'upload' && styles.tabTextActive,
+                      {color: colors.textSecondary},
+                      activeTab === 'upload' && {
+                        color: colors.primaryStart,
+                        fontWeight: '700',
+                      },
                     ]}>
-                    📁 Upload Document
+                    Upload
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[
                     styles.tabButton,
-                    activeTab === 'paste' && styles.tabButtonActive,
+                    activeTab === 'paste' && [
+                      styles.tabButtonActive,
+                      {
+                        backgroundColor: colors.bgCard,
+                        borderColor: colors.border,
+                      },
+                    ],
                   ]}
                   onPress={() => setActiveTab('paste')}>
+                  <Icon
+                    name="clipboard-outline"
+                    size={ICON_SIZES.sm}
+                    color={
+                      activeTab === 'paste'
+                        ? colors.primaryStart
+                        : colors.textSecondary
+                    }
+                    style={{marginRight: 4}}
+                  />
                   <Text
                     style={[
                       styles.tabText,
-                      activeTab === 'paste' && styles.tabTextActive,
+                      {color: colors.textSecondary},
+                      activeTab === 'paste' && {
+                        color: colors.primaryStart,
+                        fontWeight: '700',
+                      },
                     ]}>
-                    📝 Paste Text
+                    Paste Text
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -408,13 +636,34 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
               {activeTab === 'upload' ? (
                 <View style={styles.uploadArea}>
                   {selectedFile ? (
-                    <View style={styles.fileCard}>
-                      <Text style={styles.fileIcon}>📄</Text>
+                    <View
+                      style={[
+                        styles.fileCard,
+                        {
+                          backgroundColor: colors.bgInput,
+                          borderColor: colors.border,
+                        },
+                      ]}>
+                      <Icon
+                        name="document"
+                        size={ICON_SIZES.lg}
+                        color={colors.primaryStart}
+                        style={{marginRight: SPACING.sm}}
+                      />
                       <View style={styles.fileDetails}>
-                        <Text style={styles.fileName} numberOfLines={1}>
+                        <Text
+                          style={[
+                            styles.fileName,
+                            {color: colors.textPrimary},
+                          ]}
+                          numberOfLines={1}>
                           {selectedFile.name}
                         </Text>
-                        <Text style={styles.fileSize}>
+                        <Text
+                          style={[
+                            styles.fileSize,
+                            {color: colors.textSecondary},
+                          ]}>
                           {selectedFile.size
                             ? `${(selectedFile.size / 1024).toFixed(1)} KB`
                             : 'Ready to analyze'}
@@ -426,30 +675,61 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
                         style={styles.filePreviewBtn}
                         activeOpacity={0.7}>
                         {previewing ? (
-                          <ActivityIndicator size="small" color={COLORS.accent} />
+                          <ActivityIndicator size="small" color={colors.accent} />
                         ) : (
-                          <Text style={styles.filePreviewText}>👁️ Preview</Text>
+                          <Icon
+                            name="eye-outline"
+                            size={ICON_SIZES.md}
+                            color={colors.accent}
+                          />
                         )}
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => setSelectedFile(null)}
                         style={styles.fileRemoveBtn}>
-                        <Text style={styles.fileRemoveText}>✕</Text>
+                        <Icon
+                          name="close-circle"
+                          size={ICON_SIZES.lg}
+                          color={colors.error}
+                        />
                       </TouchableOpacity>
                     </View>
                   ) : (
                     <TouchableOpacity
                       onPress={handlePickDocument}
-                      style={styles.uploadDottedBox}
+                      style={[
+                        styles.uploadDottedBox,
+                        {
+                          backgroundColor: colors.bgInput,
+                          borderColor: colors.border,
+                        },
+                      ]}
                       activeOpacity={0.7}>
-                      <Text style={styles.uploadEmoji}>☁️</Text>
-                      <Text style={styles.uploadTitle}>
+                      <Icon
+                        name="cloud-upload"
+                        size={ICON_SIZES.hero}
+                        color={colors.primaryStart}
+                        style={{marginBottom: SPACING.xs}}
+                      />
+                      <Text
+                        style={[
+                          styles.uploadTitle,
+                          {color: colors.textPrimary},
+                        ]}>
                         Select PDF, DOCX or TXT file
                       </Text>
-                      <Text style={styles.uploadSubtitle}>
+                      <Text
+                        style={[
+                          styles.uploadSubtitle,
+                          {color: colors.textSecondary},
+                        ]}>
                         Tap to browse files from device
                       </Text>
-                      <View style={styles.browseButton}>
+                      <View
+                        style={[
+                          styles.browseButton,
+                          {backgroundColor: colors.primaryStart},
+                        ]}>
                         <Text style={styles.browseButtonText}>Browse File</Text>
                       </View>
                     </TouchableOpacity>
@@ -458,9 +738,17 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
               ) : (
                 <View style={styles.pasteArea}>
                   <TextInput
-                    style={[styles.textInput, styles.cvTextArea]}
+                    style={[
+                      styles.textInput,
+                      styles.cvTextArea,
+                      {
+                        backgroundColor: colors.bgInput,
+                        borderColor: colors.border,
+                        color: colors.textPrimary,
+                      },
+                    ]}
                     placeholder="Paste your CV text here (Summary, Skills, Work Experience, Education)..."
-                    placeholderTextColor={COLORS.textMuted}
+                    placeholderTextColor={colors.textMuted}
                     value={pastedText}
                     onChangeText={setPastedText}
                     multiline
@@ -468,14 +756,24 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
                     textAlignVertical="top"
                   />
                   <View style={styles.pasteFooter}>
-                    <Text style={styles.charCount}>
+                    <Text
+                      style={[
+                        styles.charCount,
+                        {color: colors.textMuted},
+                      ]}>
                       {pastedText.length} characters
                     </Text>
-                    <TouchableOpacity onPress={handleLoadSample}>
-                      <Text style={styles.loadSampleLink}>
-                        + Fill with Sample CV
-                      </Text>
-                    </TouchableOpacity>
+                    {pastedText.length > 0 && (
+                      <TouchableOpacity onPress={() => setPastedText('')}>
+                        <Text
+                          style={[
+                            styles.clearTextLink,
+                            {color: colors.accent},
+                          ]}>
+                          Clear Text
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               )}
@@ -488,12 +786,18 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
               activeOpacity={0.85}
               style={styles.analyzeButtonWrapper}>
               <LinearGradient
-                colors={[COLORS.primaryStart, COLORS.primaryEnd]}
+                colors={[colors.primaryStart, colors.primaryEnd]}
                 style={styles.analyzeButton}
                 start={{x: 0, y: 0}}
                 end={{x: 1, y: 1}}>
+                <Icon
+                  name="flash"
+                  size={ICON_SIZES.lg}
+                  color="#FFFFFF"
+                  style={{marginRight: SPACING.sm}}
+                />
                 <Text style={styles.analyzeButtonText}>
-                  ✨ Analyze & Score Resume
+                  Analyze & Score Resume
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -509,13 +813,13 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
                 {transform: [{scale: pulseAnim}]},
               ]}>
               <LinearGradient
-                colors={[COLORS.primaryStart, COLORS.primaryEnd]}
+                colors={[colors.primaryStart, colors.primaryEnd]}
                 style={styles.loadingCircle}>
-                <Text style={styles.loadingEmoji}>⚡</Text>
+                <Icon name="flash" size={36} color="#FFFFFF" />
               </LinearGradient>
               <ActivityIndicator
                 size="large"
-                color={COLORS.accent}
+                color={colors.accent}
                 style={{marginVertical: SPACING.md}}
               />
               <Text style={styles.loadingTitle}>AI Career Coach at Work</Text>
@@ -526,6 +830,16 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
           </View>
         )}
       </LinearGradient>
+
+      {/* In-App Native PDF Preview Modal */}
+      <PdfPreviewModal
+        visible={showPdfPreview}
+        fileUri={selectedFile?.uri || null}
+        fileName={selectedFile?.name}
+        fileSize={selectedFile?.size}
+        onClose={() => setShowPdfPreview(false)}
+        onReplaceFile={handlePickDocument}
+      />
     </View>
   );
 };
@@ -538,41 +852,82 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: SPACING.lg,
-    paddingTop: Platform.OS === 'ios' ? 54 : SPACING.lg,
+    paddingTop: SPACING.xxl + 8,
     paddingBottom: SPACING.md,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
   },
-  backButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.xs,
   },
-  backText: {
-    color: COLORS.accent,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  sampleButton: {
-    backgroundColor: COLORS.bgCardLight,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  headerBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: COLORS.border,
   },
-  sampleButtonText: {
-    color: COLORS.textSecondary,
+  headerSparkleBg: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 6,
+  },
+  headerBadgeText: {
+    fontFamily: FONTS.extraBold,
+    fontSize: 10,
+    letterSpacing: 0.6,
+  },
+  headerTitle: {
+    fontFamily: FONTS.bold,
+    fontSize: 24,
+    letterSpacing: -0.5,
+    marginTop: 4,
+    marginBottom: 3,
+  },
+  headerSubtitle: {
+    fontFamily: FONTS.regular,
     fontSize: 12,
-    fontWeight: '600',
+    lineHeight: 16,
+    marginBottom: SPACING.md,
+  },
+  stepperContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  stepItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  stepDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stepDotText: {
+    fontFamily: FONTS.extraBold,
+    color: '#FFFFFF',
+    fontSize: 10,
+  },
+  stepLine: {
+    flex: 1,
+    height: 2,
+    marginHorizontal: SPACING.sm,
+    borderRadius: 1,
+  },
+  stepItemLabel: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 11,
   },
   scrollContent: {
     padding: SPACING.lg,
@@ -591,33 +946,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
+  stepBadgeContainer: {
+    marginRight: 8,
+  },
   stepBadge: {
-    backgroundColor: COLORS.primaryStart,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stepBadgeText: {
+    fontFamily: FONTS.extraBold,
     color: '#fff',
     fontSize: 11,
-    fontWeight: '800',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginRight: 8,
   },
   stepBadgeOptional: {
     backgroundColor: COLORS.bgCardLight,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stepBadgeOptionalText: {
+    fontFamily: FONTS.extraBold,
     color: COLORS.textSecondary,
     fontSize: 11,
-    fontWeight: '800',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginRight: 8,
   },
   sectionTitle: {
+    fontFamily: FONTS.bold,
     fontSize: 16,
-    fontWeight: '700',
     color: COLORS.textPrimary,
   },
   requiredStar: {
@@ -626,12 +985,14 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   sectionSubtitle: {
+    fontFamily: FONTS.regular,
     fontSize: 12,
     color: COLORS.textSecondary,
     marginBottom: SPACING.md,
     lineHeight: 16,
   },
   textInput: {
+    fontFamily: FONTS.regular,
     backgroundColor: COLORS.bgInput,
     borderRadius: RADIUS.md,
     borderWidth: 1,
@@ -652,8 +1013,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   chipsLabel: {
+    fontFamily: FONTS.semiBold,
     fontSize: 11,
-    fontWeight: '600',
     color: COLORS.textMuted,
     marginTop: SPACING.md,
     marginBottom: SPACING.xs,
@@ -678,13 +1039,13 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primaryStart,
   },
   roleChipText: {
+    fontFamily: FONTS.medium,
     color: COLORS.textSecondary,
     fontSize: 12,
-    fontWeight: '500',
   },
   roleChipTextActive: {
+    fontFamily: FONTS.bold,
     color: COLORS.accent,
-    fontWeight: '700',
   },
   accordionHeader: {
     flexDirection: 'row',
@@ -696,13 +1057,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   optionalTag: {
+    fontFamily: FONTS.regular,
     fontSize: 11,
     color: COLORS.textMuted,
     marginTop: 2,
-  },
-  accordionIcon: {
-    color: COLORS.textSecondary,
-    fontSize: 12,
   },
   accordionContent: {
     marginTop: SPACING.md,
@@ -719,18 +1077,20 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     alignItems: 'center',
     borderRadius: RADIUS.sm,
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   tabButtonActive: {
     backgroundColor: COLORS.bgCard,
   },
   tabText: {
+    fontFamily: FONTS.semiBold,
     fontSize: 12,
-    fontWeight: '600',
     color: COLORS.textSecondary,
   },
   tabTextActive: {
+    fontFamily: FONTS.bold,
     color: COLORS.textPrimary,
-    fontWeight: '700',
   },
   uploadArea: {
     marginTop: SPACING.xs,
@@ -742,19 +1102,16 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
     alignItems: 'center',
-    backgroundColor: 'rgba(108, 99, 255, 0.05)',
-  },
-  uploadEmoji: {
-    fontSize: 32,
-    marginBottom: SPACING.xs,
+    backgroundColor: 'transparent',
   },
   uploadTitle: {
+    fontFamily: FONTS.bold,
     fontSize: 14,
-    fontWeight: '700',
     color: COLORS.textPrimary,
     marginBottom: 4,
   },
   uploadSubtitle: {
+    fontFamily: FONTS.regular,
     fontSize: 12,
     color: COLORS.textSecondary,
     marginBottom: SPACING.md,
@@ -766,9 +1123,9 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
   },
   browseButtonText: {
+    fontFamily: FONTS.semiBold,
     color: '#fff',
     fontSize: 12,
-    fontWeight: '600',
   },
   fileCard: {
     flexDirection: 'row',
@@ -779,19 +1136,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.primaryStart,
   },
-  fileIcon: {
-    fontSize: 24,
-    marginRight: SPACING.sm,
-  },
   fileDetails: {
     flex: 1,
   },
   fileName: {
+    fontFamily: FONTS.semiBold,
     fontSize: 13,
-    fontWeight: '600',
     color: COLORS.textPrimary,
   },
   fileSize: {
+    fontFamily: FONTS.regular,
     fontSize: 11,
     color: COLORS.textSecondary,
     marginTop: 2,
@@ -799,13 +1153,8 @@ const styles = StyleSheet.create({
   fileRemoveBtn: {
     padding: 6,
   },
-  fileRemoveText: {
-    color: COLORS.error,
-    fontSize: 16,
-    fontWeight: '700',
-  },
   filePreviewBtn: {
-    backgroundColor: 'rgba(0, 210, 255, 0.15)',
+    backgroundColor: 'rgba(166, 124, 82, 0.12)',
     borderWidth: 1,
     borderColor: COLORS.accent,
     paddingHorizontal: 10,
@@ -814,11 +1163,6 @@ const styles = StyleSheet.create({
     marginRight: SPACING.xs,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  filePreviewText: {
-    color: COLORS.accent,
-    fontSize: 12,
-    fontWeight: '700',
   },
   pasteArea: {
     marginTop: SPACING.xs,
@@ -830,13 +1174,13 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   charCount: {
+    fontFamily: FONTS.regular,
     fontSize: 11,
     color: COLORS.textMuted,
   },
-  loadSampleLink: {
+  clearTextLink: {
+    fontFamily: FONTS.semiBold,
     fontSize: 11,
-    color: COLORS.accent,
-    fontWeight: '600',
   },
   analyzeButtonWrapper: {
     marginTop: SPACING.sm,
@@ -852,16 +1196,17 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
   },
   analyzeButtonText: {
+    fontFamily: FONTS.extraBold,
     color: '#fff',
     fontSize: 16,
-    fontWeight: '800',
     letterSpacing: 0.5,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(10, 14, 33, 0.92)',
+    backgroundColor: 'rgba(18, 17, 16, 0.94)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: SPACING.xl,
@@ -882,16 +1227,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.8,
     shadowRadius: 20,
   },
-  loadingEmoji: {
-    fontSize: 36,
-  },
   loadingTitle: {
+    fontFamily: FONTS.bold,
     fontSize: 20,
-    fontWeight: '800',
     color: COLORS.textPrimary,
     marginBottom: 6,
   },
   loadingStepText: {
+    fontFamily: FONTS.medium,
     fontSize: 13,
     color: COLORS.accent,
     textAlign: 'center',

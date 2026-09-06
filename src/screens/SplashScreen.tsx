@@ -8,11 +8,14 @@ import {
   StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import {COLORS, SPACING} from '../lib/theme';
+import {useTheme} from '../context/ThemeContext';
+import {COLORS, SPACING, ICON_SIZES, FONTS} from '../lib/theme';
+import Icon from '../components/Icon';
 
 const {width, height} = Dimensions.get('window');
 
 const SplashScreen = ({onFinish}: {onFinish: () => void}) => {
+  const {colors, isDark} = useTheme();
   const logoScale = useRef(new Animated.Value(0.3)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const titleOpacity = useRef(new Animated.Value(0)).current;
@@ -107,9 +110,9 @@ const SplashScreen = ({onFinish}: {onFinish: () => void}) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <LinearGradient
-        colors={[COLORS.bgDark, '#0F1329', '#141833']}
+        colors={[colors.bgDark, colors.gradientMiddle, colors.gradientEnd]}
         style={styles.gradient}>
         {/* Decorative circles */}
         <View style={[styles.decorCircle, styles.decorCircle1]} />
@@ -129,11 +132,15 @@ const SplashScreen = ({onFinish}: {onFinish: () => void}) => {
             },
           ]}>
           <LinearGradient
-            colors={[COLORS.primaryStart, COLORS.primaryEnd]}
+            colors={[colors.primaryStart, colors.primaryEnd]}
             style={styles.logoGradient}
             start={{x: 0, y: 0}}
             end={{x: 1, y: 1}}>
-            <Text style={styles.logoIcon}>🎯</Text>
+            <Icon
+              name="rocket"
+              size={ICON_SIZES.hero}
+              color="#FFFFFF"
+            />
           </LinearGradient>
         </Animated.View>
 
@@ -143,11 +150,17 @@ const SplashScreen = ({onFinish}: {onFinish: () => void}) => {
             opacity: titleOpacity,
             transform: [{translateY: titleTranslateY}],
           }}>
-          <Text style={styles.title}>PrepRole</Text>
+          <Text style={[styles.title, {color: colors.textPrimary}]}>
+            PrepRole
+          </Text>
         </Animated.View>
 
         {/* Subtitle */}
-        <Animated.Text style={[styles.subtitle, {opacity: subtitleOpacity}]}>
+        <Animated.Text
+          style={[
+            styles.subtitle,
+            {opacity: subtitleOpacity, color: colors.textSecondary},
+          ]}>
           Ace your next interview
         </Animated.Text>
       </LinearGradient>
@@ -217,17 +230,15 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 15,
   },
-  logoIcon: {
-    fontSize: 48,
-  },
   title: {
+    fontFamily: FONTS.bold,
     fontSize: 36,
-    fontWeight: '800',
     color: COLORS.textPrimary,
     letterSpacing: 1.5,
     textAlign: 'center',
   },
   subtitle: {
+    fontFamily: FONTS.medium,
     fontSize: 16,
     color: COLORS.textSecondary,
     marginTop: SPACING.sm,

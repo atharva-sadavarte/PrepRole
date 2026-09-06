@@ -11,11 +11,14 @@ import {
   Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import {COLORS, RADIUS, SPACING} from '../lib/theme';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {useTheme} from '../context/ThemeContext';
+import {RADIUS, SPACING, ICON_SIZES, FONTS, SHADOWS} from '../lib/theme';
 import {ScoreGauge} from '../components/ScoreGauge';
 import {RecommendationCard} from '../components/RecommendationCard';
 import {openResumeInViewer} from '../services/resumeService';
 import {ResumeAnalysisRecord, PriorityLevel} from '../types/resume';
+import Icon from '../components/Icon';
 
 interface CVScoreResultScreenProps {
   route: {
@@ -30,6 +33,8 @@ export const CVScoreResultScreen: React.FC<CVScoreResultScreenProps> = ({
   route,
   navigation,
 }) => {
+  const insets = useSafeAreaInsets();
+  const {colors, isDark} = useTheme();
   const {analysis} = route.params;
   const [activeTab, setActiveTab] = useState<'recommendations' | 'skills' | 'strengths'>(
     'recommendations',
@@ -47,7 +52,7 @@ export const CVScoreResultScreen: React.FC<CVScoreResultScreenProps> = ({
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `My CV scored ${analysis.overall_score}/100 for the role of ${analysis.target_role} on PrepRole! 🚀`,
+        message: `My CV scored ${analysis.overall_score}/100 for the role of ${analysis.target_role} on PrepRole!`,
       });
     } catch (e) {
       console.error(e);
@@ -63,135 +68,484 @@ export const CVScoreResultScreen: React.FC<CVScoreResultScreenProps> = ({
   const completedCount = Object.values(completedMap).filter(Boolean).length;
   const totalCount = improvements.length;
 
+  const getPriorityIcon = (p: string) => {
+    switch (p) {
+      case 'high':
+        return {color: '#C25953', label: 'Critical'};
+      case 'medium':
+        return {color: '#D9822B', label: 'Medium'};
+      case 'low':
+        return {color: '#5B8266', label: 'Polish'};
+      default:
+        return {color: colors.textSecondary, label: 'All'};
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <LinearGradient
-        colors={[COLORS.bgDark, '#0F1329', '#141833']}
+        colors={[colors.bgDark, colors.gradientMiddle, colors.gradientEnd]}
         style={styles.gradient}>
-        {/* Header */}
-        <View style={styles.header}>
+        {/* Header with Safe Area Insets */}
+        <View
+          style={[
+            styles.header,
+            {
+              paddingTop: Math.max(insets.top, StatusBar.currentHeight || 0) + SPACING.xs,
+              backgroundColor: colors.bgDark,
+              borderBottomColor: colors.border,
+            },
+          ]}>
           <TouchableOpacity
-            onPress={() => navigation.navigate('Dashboard')}
-            style={styles.backButton}>
-            <Text style={styles.backText}>← Dashboard</Text>
+            onPress={() => navigation.goBack()}
+            style={[
+              styles.headerBtn,
+              {
+                backgroundColor: colors.bgCard,
+                borderColor: colors.border,
+              },
+            ]}
+            activeOpacity={0.7}
+            accessibilityLabel="Go back">
+            <Icon
+              name="chevron-back"
+              size={20}
+              color={colors.textPrimary}
+            />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>CV Score Report</Text>
-          <TouchableOpacity onPress={handleShare} style={styles.shareButton}>
-            <Text style={styles.shareText}>Share ↗</Text>
+
+          <Text style={[styles.headerTitle, {color: colors.textPrimary}]}>
+            CV Score Report
+          </Text>
+
+          <TouchableOpacity
+            onPress={handleShare}
+            style={[
+              styles.headerBtn,
+              {
+                backgroundColor: colors.bgCard,
+                borderColor: colors.border,
+              },
+            ]}
+            activeOpacity={0.7}
+            accessibilityLabel="Share score report">
+            <Icon
+              name="share-outline"
+              size={18}
+              color={colors.textPrimary}
+            />
           </TouchableOpacity>
         </View>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}>
+          contentContainerStyle={[
+            styles.scrollContent,
+            {
+              paddingBottom: Math.max(insets.bottom, 48) + SPACING.xxl,
+            },
+          ]}>
           {/* Target Role Banner */}
-          <View style={styles.roleBanner}>
-            <Text style={styles.roleLabel}>ANALYSIS FOR TARGET ROLE</Text>
-            <Text style={styles.roleTitle}>{analysis.target_role}</Text>
+          <View
+            style={[
+              styles.roleBanner,
+              {
+                backgroundColor: colors.bgCard,
+                borderColor: colors.border,
+                shadowColor: colors.cardShadow,
+                elevation: isDark ? 2 : 4,
+              },
+            ]}>
+            <View style={styles.roleBannerTopRow}>
+              <View
+                style={[
+                  styles.roleBadgePill,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(196, 154, 114, 0.15)'
+                      : 'rgba(166, 124, 82, 0.12)',
+                    borderColor: isDark
+                      ? 'rgba(196, 154, 114, 0.3)'
+                      : 'rgba(166, 124, 82, 0.25)',
+                  },
+                ]}>
+                <Icon name="briefcase-outline" size={11} color={colors.accent} />
+                <Text style={[styles.roleLabel, {color: colors.accent}]}>
+                  TARGET ROLE ANALYSIS
+                </Text>
+              </View>
+            </View>
+
+            <Text style={[styles.roleTitle, {color: colors.textPrimary}]}>
+              {analysis.target_role}
+            </Text>
+
             {analysis.file_name && (
               <View style={styles.sourceContainer}>
-                <Text style={styles.fileSub}>Source: {analysis.file_name}</Text>
+                <View
+                  style={[
+                    styles.fileIconPill,
+                    {
+                      backgroundColor: isDark
+                        ? 'rgba(255, 255, 255, 0.06)'
+                        : 'rgba(36, 35, 33, 0.05)',
+                    },
+                  ]}>
+                  <Icon
+                    name="document-text-outline"
+                    size={13}
+                    color={colors.accent}
+                  />
+                </View>
+                <Text
+                  style={[styles.fileSub, {color: colors.textSecondary}]}
+                  numberOfLines={1}
+                  ellipsizeMode="middle">
+                  {analysis.file_name}
+                </Text>
                 {analysis.file_url ? (
                   <TouchableOpacity
                     onPress={() => openResumeInViewer(analysis.file_url!)}
-                    style={styles.previewBadgeBtn}
+                    style={[
+                      styles.previewBadgeBtn,
+                      {
+                        backgroundColor: isDark
+                          ? 'rgba(196, 154, 114, 0.15)'
+                          : 'rgba(166, 124, 82, 0.12)',
+                        borderColor: isDark
+                          ? 'rgba(196, 154, 114, 0.35)'
+                          : 'rgba(166, 124, 82, 0.3)',
+                      },
+                    ]}
                     activeOpacity={0.7}>
-                    <Text style={styles.previewBadgeText}>👁️ View PDF ↗</Text>
+                    <Icon
+                      name="eye-outline"
+                      size={13}
+                      color={colors.accent}
+                      style={{marginRight: 4}}
+                    />
+                    <Text
+                      style={[
+                        styles.previewBadgeText,
+                        {color: colors.accent},
+                      ]}>
+                      View PDF
+                    </Text>
                   </TouchableOpacity>
                 ) : null}
               </View>
             )}
           </View>
 
-          {/* Score Hero */}
-          <View style={styles.heroCard}>
+          {/* Score Hero Card */}
+          <View
+            style={[
+              styles.heroCard,
+              {
+                backgroundColor: colors.bgCard,
+                borderColor: colors.border,
+                shadowColor: colors.cardShadow,
+                elevation: isDark ? 2 : 4,
+              },
+            ]}>
             <ScoreGauge
               score={analysis.overall_score}
               tier={analysis.score_tier}
             />
 
-            {/* Executive Summary */}
-            <View style={styles.summaryBox}>
-              <Text style={styles.summaryTitle}>AI Executive Summary</Text>
-              <Text style={styles.summaryText}>{analysis.summary}</Text>
+            {/* AI Executive Summary Box */}
+            <View
+              style={[
+                styles.summaryBox,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(196, 154, 114, 0.07)'
+                    : 'rgba(166, 124, 82, 0.06)',
+                  borderColor: isDark
+                    ? 'rgba(196, 154, 114, 0.22)'
+                    : 'rgba(166, 124, 82, 0.2)',
+                  borderLeftColor: colors.accent,
+                },
+              ]}>
+              <View style={styles.summaryHeader}>
+                <View
+                  style={[
+                    styles.summaryIconBadge,
+                    {
+                      backgroundColor: isDark
+                        ? 'rgba(196, 154, 114, 0.2)'
+                        : 'rgba(166, 124, 82, 0.15)',
+                    },
+                  ]}>
+                  <Icon
+                    name="sparkles"
+                    size={12}
+                    color={colors.accent}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.summaryTitle,
+                    {color: colors.accent},
+                  ]}>
+                  AI Executive Summary
+                </Text>
+              </View>
+              <Text
+                style={[
+                  styles.summaryText,
+                  {color: colors.textPrimary},
+                ]}>
+                {analysis.summary}
+              </Text>
             </View>
 
             {/* 4 Score Breakdown Pillars */}
             <View style={styles.breakdownGrid}>
-              <View style={styles.breakdownItem}>
-                <Text style={styles.breakdownIcon}>🎯</Text>
-                <Text style={styles.breakdownScore}>
+              <View
+                style={[
+                  styles.breakdownItem,
+                  {
+                    backgroundColor: isDark
+                      ? colors.bgCardLight
+                      : 'rgba(36, 35, 33, 0.04)',
+                    borderColor: colors.border,
+                  },
+                ]}>
+                <Icon
+                  name="compass-outline"
+                  size={ICON_SIZES.md}
+                  color={colors.accent}
+                />
+                <Text
+                  style={[
+                    styles.breakdownScore,
+                    {color: colors.textPrimary},
+                  ]}>
                   {analysis.breakdown?.relevance || 0}%
                 </Text>
-                <Text style={styles.breakdownLabel}>Role Alignment</Text>
+                <Text
+                  style={[
+                    styles.breakdownLabel,
+                    {color: colors.textSecondary},
+                  ]}
+                  numberOfLines={1}>
+                  Role
+                </Text>
               </View>
-              <View style={styles.breakdownItem}>
-                <Text style={styles.breakdownIcon}>🛠️</Text>
-                <Text style={styles.breakdownScore}>
+
+              <View
+                style={[
+                  styles.breakdownItem,
+                  {
+                    backgroundColor: isDark
+                      ? colors.bgCardLight
+                      : 'rgba(36, 35, 33, 0.04)',
+                    borderColor: colors.border,
+                  },
+                ]}>
+                <Icon
+                  name="hardware-chip-outline"
+                  size={ICON_SIZES.md}
+                  color={colors.primaryStart}
+                />
+                <Text
+                  style={[
+                    styles.breakdownScore,
+                    {color: colors.textPrimary},
+                  ]}>
                   {analysis.breakdown?.skills || 0}%
                 </Text>
-                <Text style={styles.breakdownLabel}>Skills Match</Text>
+                <Text
+                  style={[
+                    styles.breakdownLabel,
+                    {color: colors.textSecondary},
+                  ]}
+                  numberOfLines={1}>
+                  Skills
+                </Text>
               </View>
-              <View style={styles.breakdownItem}>
-                <Text style={styles.breakdownIcon}>📈</Text>
-                <Text style={styles.breakdownScore}>
+
+              <View
+                style={[
+                  styles.breakdownItem,
+                  {
+                    backgroundColor: isDark
+                      ? colors.bgCardLight
+                      : 'rgba(36, 35, 33, 0.04)',
+                    borderColor: colors.border,
+                  },
+                ]}>
+                <Icon
+                  name="trending-up-outline"
+                  size={ICON_SIZES.md}
+                  color={colors.success}
+                />
+                <Text
+                  style={[
+                    styles.breakdownScore,
+                    {color: colors.textPrimary},
+                  ]}>
                   {analysis.breakdown?.impact || 0}%
                 </Text>
-                <Text style={styles.breakdownLabel}>Metrics & Impact</Text>
+                <Text
+                  style={[
+                    styles.breakdownLabel,
+                    {color: colors.textSecondary},
+                  ]}
+                  numberOfLines={1}>
+                  Impact
+                </Text>
               </View>
-              <View style={styles.breakdownItem}>
-                <Text style={styles.breakdownIcon}>📄</Text>
-                <Text style={styles.breakdownScore}>
+
+              <View
+                style={[
+                  styles.breakdownItem,
+                  {
+                    backgroundColor: isDark
+                      ? colors.bgCardLight
+                      : 'rgba(36, 35, 33, 0.04)',
+                    borderColor: colors.border,
+                  },
+                ]}>
+                <Icon
+                  name="document-text-outline"
+                  size={ICON_SIZES.md}
+                  color={colors.warning}
+                />
+                <Text
+                  style={[
+                    styles.breakdownScore,
+                    {color: colors.textPrimary},
+                  ]}>
                   {analysis.breakdown?.ats || 0}%
                 </Text>
-                <Text style={styles.breakdownLabel}>ATS Readability</Text>
+                <Text
+                  style={[
+                    styles.breakdownLabel,
+                    {color: colors.textSecondary},
+                  ]}
+                  numberOfLines={1}>
+                  ATS
+                </Text>
               </View>
             </View>
           </View>
 
           {/* Navigation Tabs */}
-          <View style={styles.tabsContainer}>
+          <View
+            style={[
+              styles.tabsContainer,
+              {
+                backgroundColor: isDark
+                  ? colors.bgCardLight
+                  : 'rgba(36, 35, 33, 0.05)',
+                borderColor: colors.border,
+              },
+            ]}>
             <TouchableOpacity
               style={[
                 styles.tabButton,
-                activeTab === 'recommendations' && styles.tabButtonActive,
+                activeTab === 'recommendations' && [
+                  styles.tabButtonActive,
+                  {
+                    backgroundColor: colors.bgCard,
+                    borderColor: colors.border,
+                  },
+                ],
               ]}
               onPress={() => setActiveTab('recommendations')}>
+              <Icon
+                name={activeTab === 'recommendations' ? 'bulb' : 'bulb-outline'}
+                size={ICON_SIZES.sm}
+                color={
+                  activeTab === 'recommendations'
+                    ? colors.accent
+                    : colors.textSecondary
+                }
+                style={{marginRight: 4}}
+              />
               <Text
                 style={[
                   styles.tabText,
-                  activeTab === 'recommendations' && styles.tabTextActive,
+                  {color: colors.textSecondary},
+                  activeTab === 'recommendations' && {
+                    color: colors.accent,
+                    fontFamily: FONTS.bold,
+                  },
                 ]}>
-                💡 Recommendations ({improvements.length})
+                Tips ({improvements.length})
               </Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               style={[
                 styles.tabButton,
-                activeTab === 'skills' && styles.tabButtonActive,
+                activeTab === 'skills' && [
+                  styles.tabButtonActive,
+                  {
+                    backgroundColor: colors.bgCard,
+                    borderColor: colors.border,
+                  },
+                ],
               ]}
               onPress={() => setActiveTab('skills')}>
+              <Icon
+                name={activeTab === 'skills' ? 'flash' : 'flash-outline'}
+                size={ICON_SIZES.sm}
+                color={
+                  activeTab === 'skills'
+                    ? colors.accent
+                    : colors.textSecondary
+                }
+                style={{marginRight: 4}}
+              />
               <Text
                 style={[
                   styles.tabText,
-                  activeTab === 'skills' && styles.tabTextActive,
+                  {color: colors.textSecondary},
+                  activeTab === 'skills' && {
+                    color: colors.accent,
+                    fontFamily: FONTS.bold,
+                  },
                 ]}>
-                ⚡ Skills Matrix
+                Skills
               </Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               style={[
                 styles.tabButton,
-                activeTab === 'strengths' && styles.tabButtonActive,
+                activeTab === 'strengths' && [
+                  styles.tabButtonActive,
+                  {
+                    backgroundColor: colors.bgCard,
+                    borderColor: colors.border,
+                  },
+                ],
               ]}
               onPress={() => setActiveTab('strengths')}>
+              <Icon
+                name={activeTab === 'strengths' ? 'star' : 'star-outline'}
+                size={ICON_SIZES.sm}
+                color={
+                  activeTab === 'strengths'
+                    ? colors.accent
+                    : colors.textSecondary
+                }
+                style={{marginRight: 4}}
+              />
               <Text
                 style={[
                   styles.tabText,
-                  activeTab === 'strengths' && styles.tabTextActive,
+                  {color: colors.textSecondary},
+                  activeTab === 'strengths' && {
+                    color: colors.accent,
+                    fontFamily: FONTS.bold,
+                  },
                 ]}>
-                🌟 Strengths
+                Strengths
               </Text>
             </TouchableOpacity>
           </View>
@@ -201,14 +555,28 @@ export const CVScoreResultScreen: React.FC<CVScoreResultScreenProps> = ({
             <View style={styles.sectionContainer}>
               {/* Progress counter */}
               <View style={styles.progressRow}>
-                <Text style={styles.progressText}>
-                  Action Plan: {completedCount} of {totalCount} completed
-                </Text>
-                <View style={styles.progressBarBg}>
+                <View style={styles.progressLabelRow}>
+                  <Text style={[styles.progressText, {color: colors.textPrimary}]}>
+                    Action Plan
+                  </Text>
+                  <Text style={[styles.progressCount, {color: colors.accent}]}>
+                    {completedCount} of {totalCount} completed
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.progressBarBg,
+                    {
+                      backgroundColor: isDark
+                        ? colors.bgCardLight
+                        : 'rgba(36, 35, 33, 0.08)',
+                    },
+                  ]}>
                   <View
                     style={[
                       styles.progressBarFill,
                       {
+                        backgroundColor: colors.success,
                         width:
                           totalCount > 0
                             ? `${(completedCount / totalCount) * 100}%`
@@ -221,29 +589,54 @@ export const CVScoreResultScreen: React.FC<CVScoreResultScreenProps> = ({
 
               {/* Priority Filters */}
               <View style={styles.filtersRow}>
-                {(['all', 'high', 'medium', 'low'] as const).map(p => (
-                  <TouchableOpacity
-                    key={p}
-                    style={[
-                      styles.filterChip,
-                      priorityFilter === p && styles.filterChipActive,
-                    ]}
-                    onPress={() => setPriorityFilter(p)}>
-                    <Text
+                {(['all', 'high', 'medium', 'low'] as const).map(p => {
+                  const meta = getPriorityIcon(p);
+                  const isSelected = priorityFilter === p;
+                  return (
+                    <TouchableOpacity
+                      key={p}
                       style={[
-                        styles.filterChipText,
-                        priorityFilter === p && styles.filterChipTextActive,
-                      ]}>
-                      {p === 'all'
-                        ? 'All'
-                        : p === 'high'
-                        ? '🔴 Critical'
-                        : p === 'medium'
-                        ? '🟡 Medium'
-                        : '🟢 Polish'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                        styles.filterChip,
+                        {
+                          backgroundColor: isSelected
+                            ? colors.accent
+                            : colors.bgCard,
+                          borderColor: isSelected
+                            ? colors.accent
+                            : colors.border,
+                        },
+                      ]}
+                      onPress={() => setPriorityFilter(p)}
+                      activeOpacity={0.7}>
+                      {p !== 'all' && (
+                        <View
+                          style={[
+                            styles.filterDot,
+                            {
+                              backgroundColor: isSelected
+                                ? '#FFFFFF'
+                                : meta.color,
+                            },
+                          ]}
+                        />
+                      )}
+                      <Text
+                        style={[
+                          styles.filterChipText,
+                          {
+                            color: isSelected
+                              ? '#FFFFFF'
+                              : colors.textSecondary,
+                            fontFamily: isSelected
+                              ? FONTS.bold
+                              : FONTS.semiBold,
+                          },
+                        ]}>
+                        {meta.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
               {filteredImprovements.map(imp => (
@@ -263,49 +656,127 @@ export const CVScoreResultScreen: React.FC<CVScoreResultScreenProps> = ({
           {activeTab === 'skills' && (
             <View style={styles.sectionContainer}>
               {/* Matched Skills */}
-              <View style={styles.skillsCard}>
+              <View
+                style={[
+                  styles.skillsCard,
+                  {
+                    backgroundColor: colors.bgCard,
+                    borderColor: colors.border,
+                    shadowColor: colors.cardShadow,
+                    elevation: isDark ? 2 : 4,
+                  },
+                ]}>
                 <View style={styles.skillsHeader}>
-                  <Text style={styles.skillsIcon}>✅</Text>
-                  <Text style={styles.skillsTitle}>
+                  <Icon
+                    name="checkmark-circle"
+                    size={ICON_SIZES.md}
+                    color={colors.success}
+                  />
+                  <Text style={[styles.skillsTitle, {color: colors.success}]}>
                     Matched Skills ({analysis.skills_matched?.length || 0})
                   </Text>
                 </View>
-                <Text style={styles.skillsSubtitle}>
+                <Text style={[styles.skillsSubtitle, {color: colors.textSecondary}]}>
                   Identified in your CV matching requirements for this role:
                 </Text>
                 <View style={styles.skillsChips}>
                   {analysis.skills_matched?.length ? (
                     analysis.skills_matched.map((skill, idx) => (
-                      <View key={idx} style={styles.skillMatchedBadge}>
-                        <Text style={styles.skillMatchedText}>{skill} ✓</Text>
+                      <View
+                        key={idx}
+                        style={[
+                          styles.skillMatchedBadge,
+                          {
+                            backgroundColor: isDark
+                              ? 'rgba(91, 130, 102, 0.18)'
+                              : 'rgba(74, 124, 89, 0.12)',
+                            borderColor: isDark
+                              ? 'rgba(91, 130, 102, 0.4)'
+                              : 'rgba(74, 124, 89, 0.3)',
+                          },
+                        ]}>
+                        <Icon
+                          name="checkmark"
+                          size={ICON_SIZES.xs}
+                          color={colors.success}
+                          style={{marginRight: 4}}
+                        />
+                        <Text
+                          style={[
+                            styles.skillMatchedText,
+                            {color: colors.success},
+                          ]}>
+                          {skill}
+                        </Text>
                       </View>
                     ))
                   ) : (
-                    <Text style={styles.emptyText}>No matched skills detected.</Text>
+                    <Text style={[styles.emptyText, {color: colors.textMuted}]}>
+                      No matched skills detected.
+                    </Text>
                   )}
                 </View>
               </View>
 
               {/* Missing / Recommended Skills */}
-              <View style={styles.skillsCard}>
+              <View
+                style={[
+                  styles.skillsCard,
+                  {
+                    backgroundColor: colors.bgCard,
+                    borderColor: colors.border,
+                    shadowColor: colors.cardShadow,
+                    elevation: isDark ? 2 : 4,
+                  },
+                ]}>
                 <View style={styles.skillsHeader}>
-                  <Text style={styles.skillsIcon}>⚠️</Text>
-                  <Text style={[styles.skillsTitle, styles.skillsTitleWarning]}>
+                  <Icon
+                    name="alert-circle"
+                    size={ICON_SIZES.md}
+                    color={colors.warning}
+                  />
+                  <Text style={[styles.skillsTitle, {color: colors.warning}]}>
                     Recommended Skills to Add ({analysis.skills_missing?.length || 0})
                   </Text>
                 </View>
-                <Text style={styles.skillsSubtitle}>
+                <Text style={[styles.skillsSubtitle, {color: colors.textSecondary}]}>
                   Frequently requested for {analysis.target_role} but missing from your CV:
                 </Text>
                 <View style={styles.skillsChips}>
                   {analysis.skills_missing?.length ? (
                     analysis.skills_missing.map((skill, idx) => (
-                      <View key={idx} style={styles.skillMissingBadge}>
-                        <Text style={styles.skillMissingText}>+ {skill}</Text>
+                      <View
+                        key={idx}
+                        style={[
+                          styles.skillMissingBadge,
+                          {
+                            backgroundColor: isDark
+                              ? 'rgba(217, 130, 43, 0.18)'
+                              : 'rgba(194, 115, 34, 0.12)',
+                            borderColor: isDark
+                              ? 'rgba(217, 130, 43, 0.4)'
+                              : 'rgba(194, 115, 34, 0.3)',
+                          },
+                        ]}>
+                        <Icon
+                          name="add"
+                          size={ICON_SIZES.xs}
+                          color={colors.warning}
+                          style={{marginRight: 4}}
+                        />
+                        <Text
+                          style={[
+                            styles.skillMissingText,
+                            {color: colors.warning},
+                          ]}>
+                          {skill}
+                        </Text>
                       </View>
                     ))
                   ) : (
-                    <Text style={styles.emptyText}>No missing skills detected. Great job!</Text>
+                    <Text style={[styles.emptyText, {color: colors.textMuted}]}>
+                      No missing skills detected. Great job!
+                    </Text>
                   )}
                 </View>
               </View>
@@ -315,15 +786,47 @@ export const CVScoreResultScreen: React.FC<CVScoreResultScreenProps> = ({
           {/* TAB 3: STRENGTHS */}
           {activeTab === 'strengths' && (
             <View style={styles.sectionContainer}>
-              <View style={styles.strengthsCard}>
-                <Text style={styles.strengthsTitle}>What Stood Out in Your CV</Text>
-                <Text style={styles.strengthsSubtitle}>
+              <View
+                style={[
+                  styles.strengthsCard,
+                  {
+                    backgroundColor: colors.bgCard,
+                    borderColor: colors.border,
+                    shadowColor: colors.cardShadow,
+                    elevation: isDark ? 2 : 4,
+                  },
+                ]}>
+                <View style={styles.strengthsHeader}>
+                  <View
+                    style={[
+                      styles.strengthsIconBadge,
+                      {backgroundColor: colors.accentSoft},
+                    ]}>
+                    <Icon name="star" size={14} color={colors.accent} />
+                  </View>
+                  <Text style={[styles.strengthsTitle, {color: colors.textPrimary}]}>
+                    What Stood Out in Your CV
+                  </Text>
+                </View>
+                <Text style={[styles.strengthsSubtitle, {color: colors.textSecondary}]}>
                   Keep these strong elements intact when updating your resume:
                 </Text>
                 {analysis.strengths?.map((str, idx) => (
                   <View key={idx} style={styles.strengthItem}>
-                    <Text style={styles.strengthBullet}>✦</Text>
-                    <Text style={styles.strengthText}>{str}</Text>
+                    <View
+                      style={[
+                        styles.strengthBulletPill,
+                        {backgroundColor: colors.accentSoft},
+                      ]}>
+                      <Icon
+                        name="star"
+                        size={11}
+                        color={colors.accent}
+                      />
+                    </View>
+                    <Text style={[styles.strengthText, {color: colors.textPrimary}]}>
+                      {str}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -335,36 +838,73 @@ export const CVScoreResultScreen: React.FC<CVScoreResultScreenProps> = ({
             {analysis.file_url ? (
               <TouchableOpacity
                 onPress={() => openResumeInViewer(analysis.file_url!)}
-                style={styles.viewDocBtn}
+                style={[
+                  styles.viewDocBtn,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(196, 154, 114, 0.12)'
+                      : 'rgba(166, 124, 82, 0.08)',
+                    borderColor: colors.accent,
+                  },
+                ]}
                 activeOpacity={0.8}>
-                <Text style={styles.viewDocBtnText}>
-                  👁️ View Uploaded Resume (PDF) ↗
+                <Icon
+                  name="eye-outline"
+                  size={ICON_SIZES.md}
+                  color={colors.accent}
+                  style={{marginRight: 8}}
+                />
+                <Text style={[styles.viewDocBtnText, {color: colors.accent}]}>
+                  View Uploaded Resume (PDF)
                 </Text>
               </TouchableOpacity>
             ) : null}
 
             <TouchableOpacity
-              onPress={() => navigation.navigate('CVUpload')}
-              style={styles.rescanButton}
+              onPress={() => navigation.goBack()}
+              style={[
+                styles.rescanButton,
+                {
+                  backgroundColor: colors.bgCard,
+                  borderColor: colors.border,
+                },
+              ]}
               activeOpacity={0.8}>
-              <Text style={styles.rescanButtonText}>🔄 Re-Analyze Updated CV</Text>
+              <Icon
+                name="refresh"
+                size={ICON_SIZES.md}
+                color={colors.textPrimary}
+                style={{marginRight: 8}}
+              />
+              <Text style={[styles.rescanButtonText, {color: colors.textPrimary}]}>
+                Re-Analyze Updated CV
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => {
-                // Future Mock Interview link
-                navigation.navigate('Dashboard');
-              }}
+              onPress={() => navigation.goBack()}
               activeOpacity={0.85}
               style={styles.interviewButtonWrapper}>
               <LinearGradient
-                colors={[COLORS.primaryStart, COLORS.primaryEnd]}
+                colors={[colors.primaryStart, colors.primaryEnd]}
                 style={styles.interviewButton}
                 start={{x: 0, y: 0}}
                 end={{x: 1, y: 1}}>
+                <Icon
+                  name="navigate"
+                  size={ICON_SIZES.md}
+                  color="#FFFFFF"
+                  style={{marginRight: 8}}
+                />
                 <Text style={styles.interviewButtonText}>
-                  🎯 Ready for Interview Practice →
+                  Ready for Interview Practice
                 </Text>
+                <Icon
+                  name="arrow-forward"
+                  size={ICON_SIZES.md}
+                  color="#FFFFFF"
+                  style={{marginLeft: 4}}
+                />
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -386,166 +926,177 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.lg,
-    paddingTop: Platform.OS === 'ios' ? 54 : SPACING.lg,
     paddingBottom: SPACING.md,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
   },
-  backButton: {
-    paddingVertical: 6,
-  },
-  backText: {
-    color: COLORS.accent,
-    fontSize: 14,
-    fontWeight: '600',
+  headerBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
+    fontFamily: FONTS.bold,
     fontSize: 17,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  shareButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    backgroundColor: COLORS.bgCardLight,
-    borderRadius: RADIUS.full,
-  },
-  shareText: {
-    color: COLORS.textPrimary,
-    fontSize: 12,
-    fontWeight: '600',
+    letterSpacing: -0.3,
   },
   scrollContent: {
     padding: SPACING.lg,
-    paddingBottom: SPACING.xxl * 2,
   },
   roleBanner: {
+    borderRadius: RADIUS.xl,
+    padding: SPACING.lg,
     alignItems: 'center',
     marginBottom: SPACING.md,
+    borderWidth: 1,
+  },
+  roleBannerTopRow: {
+    marginBottom: SPACING.xs,
+  },
+  roleBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    gap: 5,
   },
   roleLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.accent,
-    letterSpacing: 1,
-    marginBottom: 4,
+    fontFamily: FONTS.bold,
+    fontSize: 10,
+    letterSpacing: 0.8,
   },
   roleTitle: {
+    fontFamily: FONTS.bold,
     fontSize: 22,
-    fontWeight: '800',
-    color: COLORS.textPrimary,
     textAlign: 'center',
-  },
-  fileSub: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
+    letterSpacing: -0.5,
   },
   sourceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 4,
+    marginTop: SPACING.sm,
+  },
+  fileIconPill: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fileSub: {
+    fontFamily: FONTS.medium,
+    fontSize: 12,
+    maxWidth: 160,
   },
   previewBadgeBtn: {
-    backgroundColor: 'rgba(0, 210, 255, 0.15)',
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 10,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: COLORS.accent,
   },
   previewBadgeText: {
-    color: COLORS.accent,
+    fontFamily: FONTS.bold,
     fontSize: 11,
-    fontWeight: '700',
   },
   heroCard: {
-    backgroundColor: COLORS.bgCard,
     borderRadius: RADIUS.xl,
     padding: SPACING.lg,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: COLORS.border,
     marginBottom: SPACING.lg,
   },
   summaryBox: {
-    backgroundColor: COLORS.bgInput,
     borderRadius: RADIUS.md,
     padding: SPACING.md,
     width: '100%',
     marginTop: SPACING.sm,
     marginBottom: SPACING.lg,
-    borderLeftWidth: 3,
-    borderLeftColor: COLORS.primaryStart,
+    borderWidth: 1,
+    borderLeftWidth: 4,
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  summaryIconBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 6,
   },
   summaryTitle: {
+    fontFamily: FONTS.bold,
     fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.primaryStart,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
+    letterSpacing: 0.6,
   },
   summaryText: {
+    fontFamily: FONTS.regular,
     fontSize: 13,
-    color: COLORS.textPrimary,
-    lineHeight: 19,
+    lineHeight: 20,
   },
   breakdownGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
-    gap: 8,
+    gap: 6,
   },
   breakdownItem: {
     flex: 1,
-    backgroundColor: COLORS.bgCardLight,
     borderRadius: RADIUS.md,
+    borderWidth: 1,
     paddingVertical: 10,
-    paddingHorizontal: 6,
+    paddingHorizontal: 2,
     alignItems: 'center',
-  },
-  breakdownIcon: {
-    fontSize: 18,
-    marginBottom: 4,
+    justifyContent: 'center',
   },
   breakdownScore: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: COLORS.textPrimary,
+    fontFamily: FONTS.bold,
+    fontSize: 15,
+    marginTop: 4,
+    marginBottom: 2,
   },
   breakdownLabel: {
-    fontSize: 10,
-    color: COLORS.textSecondary,
-    marginTop: 2,
+    fontFamily: FONTS.semiBold,
+    fontSize: 10.5,
     textAlign: 'center',
+    lineHeight: 14,
   },
   tabsContainer: {
     flexDirection: 'row',
-    backgroundColor: COLORS.bgCardLight,
     borderRadius: RADIUS.md,
+    borderWidth: 1,
     padding: 4,
     marginBottom: SPACING.lg,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 9,
     alignItems: 'center',
     borderRadius: RADIUS.sm,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   tabButtonActive: {
-    backgroundColor: COLORS.bgCard,
+    borderWidth: 1,
   },
   tabText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
+    fontFamily: FONTS.semiBold,
+    fontSize: 12,
     textAlign: 'center',
-  },
-  tabTextActive: {
-    color: COLORS.accent,
-    fontWeight: '700',
   },
   sectionContainer: {
     marginBottom: SPACING.lg,
@@ -553,21 +1104,28 @@ const styles = StyleSheet.create({
   progressRow: {
     marginBottom: SPACING.md,
   },
-  progressText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
+  progressLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 6,
+  },
+  progressText: {
+    fontFamily: FONTS.bold,
+    fontSize: 13,
+  },
+  progressCount: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 12,
   },
   progressBarBg: {
     height: 6,
-    backgroundColor: COLORS.bgCardLight,
     borderRadius: 3,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: COLORS.success,
+    borderRadius: 3,
   },
   filtersRow: {
     flexDirection: 'row',
@@ -575,33 +1133,27 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   filterChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: RADIUS.full,
-    backgroundColor: COLORS.bgCardLight,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    gap: 5,
   },
-  filterChipActive: {
-    backgroundColor: 'rgba(108, 99, 255, 0.25)',
-    borderColor: COLORS.primaryStart,
+  filterDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
   },
   filterChipText: {
     fontSize: 11,
-    color: COLORS.textSecondary,
-    fontWeight: '500',
-  },
-  filterChipTextActive: {
-    color: COLORS.textPrimary,
-    fontWeight: '700',
   },
   skillsCard: {
-    backgroundColor: COLORS.bgCard,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
     marginBottom: SPACING.md,
     borderWidth: 1,
-    borderColor: COLORS.border,
   },
   skillsHeader: {
     flexDirection: 'row',
@@ -609,21 +1161,15 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     gap: 6,
   },
-  skillsIcon: {
-    fontSize: 16,
-  },
   skillsTitle: {
+    fontFamily: FONTS.bold,
     fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.success,
-  },
-  skillsTitleWarning: {
-    color: '#FFAB00',
   },
   skillsSubtitle: {
+    fontFamily: FONTS.regular,
     fontSize: 12,
-    color: COLORS.textSecondary,
     marginBottom: SPACING.md,
+    lineHeight: 17,
   },
   skillsChips: {
     flexDirection: 'row',
@@ -631,69 +1177,79 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   skillMatchedBadge: {
-    backgroundColor: 'rgba(0, 230, 118, 0.12)',
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: 'rgba(0, 230, 118, 0.3)',
   },
   skillMatchedText: {
-    color: COLORS.success,
+    fontFamily: FONTS.semiBold,
     fontSize: 12,
-    fontWeight: '600',
   },
   skillMissingBadge: {
-    backgroundColor: 'rgba(255, 171, 0, 0.12)',
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: 'rgba(255, 171, 0, 0.3)',
   },
   skillMissingText: {
-    color: '#FFAB00',
+    fontFamily: FONTS.semiBold,
     fontSize: 12,
-    fontWeight: '600',
   },
   emptyText: {
+    fontFamily: FONTS.italic,
     fontSize: 12,
-    color: COLORS.textMuted,
-    fontStyle: 'italic',
   },
   strengthsCard: {
-    backgroundColor: COLORS.bgCard,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
     borderWidth: 1,
-    borderColor: COLORS.border,
   },
-  strengthsTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
+  strengthsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 4,
   },
+  strengthsIconBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  strengthsTitle: {
+    fontFamily: FONTS.bold,
+    fontSize: 16,
+  },
   strengthsSubtitle: {
+    fontFamily: FONTS.regular,
     fontSize: 12,
-    color: COLORS.textSecondary,
     marginBottom: SPACING.md,
+    lineHeight: 17,
   },
   strengthItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     marginBottom: SPACING.sm,
   },
-  strengthBullet: {
-    color: COLORS.accent,
-    fontSize: 14,
+  strengthBulletPill: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 8,
-    marginTop: 2,
+    marginTop: 1,
   },
   strengthText: {
+    fontFamily: FONTS.medium,
     flex: 1,
     fontSize: 13,
-    color: COLORS.textPrimary,
     lineHeight: 19,
   },
   bottomActions: {
@@ -701,43 +1257,43 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   viewDocBtn: {
-    backgroundColor: 'rgba(0, 210, 255, 0.12)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 14,
     borderRadius: RADIUS.lg,
-    alignItems: 'center',
     borderWidth: 1,
-    borderColor: COLORS.accent,
   },
   viewDocBtnText: {
-    color: COLORS.accent,
+    fontFamily: FONTS.bold,
     fontSize: 14,
-    fontWeight: '700',
   },
   rescanButton: {
-    backgroundColor: COLORS.bgCardLight,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 14,
     borderRadius: RADIUS.lg,
-    alignItems: 'center',
     borderWidth: 1,
-    borderColor: COLORS.border,
   },
   rescanButtonText: {
-    color: COLORS.textPrimary,
+    fontFamily: FONTS.semiBold,
     fontSize: 14,
-    fontWeight: '600',
   },
   interviewButtonWrapper: {
     borderRadius: RADIUS.lg,
     overflow: 'hidden',
   },
   interviewButton: {
+    flexDirection: 'row',
     paddingVertical: 15,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   interviewButtonText: {
-    color: '#fff',
+    fontFamily: FONTS.bold,
+    color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '700',
   },
 });
 

@@ -13,13 +13,19 @@ interface AnalyzeParams {
 
 const SYSTEM_PROMPT = `
 You are an elite Tech Career Coach and ATS Resume Specialist.
-Your job is to thoroughly analyze a candidate's CV against their target Job Role (and optional Job Description), score it rigorously, and provide actionable, high-impact recommendations to improve and maintain their CV.
+Your job is to thoroughly analyze a candidate's real CV against their target Job Role (and optional Job Description), score it rigorously, and provide actionable, high-impact recommendations to improve and maintain their CV.
+
+CRITICAL CANDIDATE IDENTITY & EXTRACTION RULES:
+1. You MUST read the candidate's ACTUAL name directly from the provided CV document or text.
+2. In the "summary" field, address the candidate by their REAL name from their CV (e.g. if the CV header is "Atharva Sadavarte", write "Atharva Sadavarte demonstrates..." or "Atharva presents...").
+3. NEVER invent, hallucinate, or use sample/placeholder names (such as "Alex Chen", "John Doe", or generic mock names). If no name is discernible, refer to "The candidate".
+4. Strictly evaluate the actual companies, projects, educational credentials, and skill sets present in the provided document or text. Do NOT assume or invent experience.
 
 You MUST respond strictly with a valid JSON object following this exact schema:
 {
   "overall_score": number, // integer 0 to 100
   "score_tier": string, // One of: "Strong Match", "Competitive", "Developing", "Needs Work"
-  "summary": string, // 2-3 sentences concise executive evaluation of candidate fit
+  "summary": string, // 2-3 sentences concise executive evaluation of candidate fit, using their real name
   "breakdown": {
     "relevance": number, // integer 0 to 100 (experience & role alignment)
     "skills": number, // integer 0 to 100 (tech stack & required tool match)
@@ -27,7 +33,7 @@ You MUST respond strictly with a valid JSON object following this exact schema:
     "ats": number // integer 0 to 100 (readability, structure, ATS keyword density)
   },
   "strengths": [
-    string // 3 to 5 clear highlights of what makes this CV stand out
+    string // 3 to 5 clear highlights of what makes this specific candidate stand out
   ],
   "improvements": [
     {
@@ -75,7 +81,7 @@ export async function analyzeCVWithAI({
   }
 
   // Construct text prompt
-  let userContent = `TARGET JOB ROLE: ${targetRole}\n`;
+  let userContent = `STRICT INSTRUCTION: Analyze ONLY the real candidate CV provided below or in the attached PDF document. Extract and address the candidate by their actual name in the executive summary. Do NOT hallucinate sample names like Alex Chen.\n\nTARGET JOB ROLE: ${targetRole}\n`;
   if (jobDescription && jobDescription.trim().length > 0) {
     userContent += `\nTARGET JOB DESCRIPTION:\n${jobDescription.trim()}\n`;
   }
@@ -84,7 +90,7 @@ export async function analyzeCVWithAI({
     userContent += `\nCANDIDATE CV CONTENT:\n${cvText.trim()}\n`;
   }
 
-  userContent += `\nPlease analyze this CV for the role of "${targetRole}" according to the instructions and return the structured JSON.`;
+  userContent += `\nPlease analyze this actual candidate CV for the role of "${targetRole}" according to the instructions and return the structured JSON.`;
 
   parts.push({text: userContent});
 
