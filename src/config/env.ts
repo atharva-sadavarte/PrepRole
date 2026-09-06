@@ -15,4 +15,6 @@ try {
 }
 
 export const GEMINI_API_KEY: string =
-  localApiKey || (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) || '';
+  localApiKey ||
+  (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) ||
+  '';

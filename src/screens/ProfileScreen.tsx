@@ -11,6 +11,7 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {GoogleSignin} from '@react-native-google-signin/google-signin';
@@ -19,6 +20,7 @@ import {useTheme} from '../context/ThemeContext';
 import {COLORS, SPACING, RADIUS, ICON_SIZES, FONTS, SHADOWS} from '../lib/theme';
 import {getUserAnalyses} from '../services/resumeService';
 import Icon from '../components/Icon';
+import OnboardingScreen from './OnboardingScreen';
 import type {Session} from '@supabase/supabase-js';
 
 const {width} = Dimensions.get('window');
@@ -36,6 +38,7 @@ const ProfileScreen = ({session}: ProfileScreenProps) => {
 
   const [showSignOutModal, setShowSignOutModal] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [showTourModal, setShowTourModal] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -154,6 +157,11 @@ const ProfileScreen = ({session}: ProfileScreenProps) => {
   ];
 
   const menuItems = [
+    {
+      icon: 'sparkles-outline',
+      label: 'App Tour & Feature Guide',
+      onPress: () => setShowTourModal(true),
+    },
     {
       icon: 'shield-checkmark-outline',
       label: 'Privacy Policy',
@@ -600,6 +608,17 @@ const ProfileScreen = ({session}: ProfileScreenProps) => {
           </Animated.View>
         </Animated.View>
       )}
+
+      {/* App Tour / Onboarding Modal */}
+      <Modal
+        visible={showTourModal}
+        animationType="slide"
+        onRequestClose={() => setShowTourModal(false)}>
+        <OnboardingScreen
+          onFinish={() => setShowTourModal(false)}
+          isModalMode={true}
+        />
+      </Modal>
     </View>
   );
 };

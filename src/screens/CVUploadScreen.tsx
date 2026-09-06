@@ -59,7 +59,7 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
   const [targetRole, setTargetRole] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [showJDInput, setShowJDInput] = useState(false);
-  const [activeTab, setActiveTab] = useState<'upload' | 'paste'>('paste');
+  const [activeTab, setActiveTab] = useState<'upload' | 'paste'>('upload');
   const [pastedText, setPastedText] = useState('');
   const [selectedFile, setSelectedFile] = useState<{
     name: string;
@@ -163,6 +163,16 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
     setShowPdfPreview(true);
   };
 
+  const resetForm = () => {
+    setTargetRole('');
+    setJobDescription('');
+    setShowJDInput(false);
+    setSelectedFile(null);
+    setPastedText('');
+    setActiveTab('upload');
+    setShowPdfPreview(false);
+  };
+
   const handleAnalyze = async () => {
     if (!targetRole.trim()) {
       Alert.alert('Required Field', 'Please specify your target job role.');
@@ -236,6 +246,9 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
       );
 
       setLoading(false);
+
+      // Reset the Analyze screen for next upload/scan
+      resetForm();
 
       // Navigate to result screen with the analysis
       navigation.navigate('CVScoreResult', {

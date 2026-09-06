@@ -1,4 +1,4 @@
-import React, {useRef, useEffect} from 'react';
+import React, {useRef, useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -8,15 +8,18 @@ import {
   Dimensions,
   StatusBar,
   ActivityIndicator,
+  Image,
+  ScrollView,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
   GoogleSignin,
   statusCodes,
 } from '@react-native-google-signin/google-signin';
 import {supabase} from '../lib/supabase';
 import {useTheme} from '../context/ThemeContext';
-import {COLORS, SPACING, RADIUS, ICON_SIZES, FONTS} from '../lib/theme';
+import {SPACING, RADIUS, ICON_SIZES, FONTS} from '../lib/theme';
 import Icon from '../components/Icon';
 
 const {width, height} = Dimensions.get('window');
@@ -28,11 +31,13 @@ GoogleSignin.configure({
 });
 
 const AuthScreen = () => {
+  const insets = useSafeAreaInsets();
   const {colors, isDark} = useTheme();
-  const [loading, setLoading] = React.useState(false);
+  const [loading, setLoading] = useState(false);
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(40)).current;
-  const buttonScale = useRef(new Animated.Value(0.9)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const buttonScale = useRef(new Animated.Value(0.92)).current;
   const featureAnims = useRef([
     new Animated.Value(0),
     new Animated.Value(0),
@@ -44,12 +49,12 @@ const AuthScreen = () => {
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 600,
+          duration: 500,
           useNativeDriver: true,
         }),
         Animated.timing(slideAnim, {
           toValue: 0,
-          duration: 600,
+          duration: 500,
           useNativeDriver: true,
         }),
       ]),
@@ -59,13 +64,12 @@ const AuthScreen = () => {
         friction: 7,
         useNativeDriver: true,
       }),
-      // Stagger feature items
       Animated.stagger(
-        150,
+        120,
         featureAnims.map(anim =>
           Animated.spring(anim, {
             toValue: 1,
-            tension: 50,
+            tension: 55,
             friction: 8,
             useNativeDriver: true,
           }),
@@ -110,186 +114,222 @@ const AuthScreen = () => {
 
   const features = [
     {
-      icon: 'document-text-outline',
-      title: 'CV Score',
-      desc: 'Get your resume rated by AI',
-      gradient: [colors.accent, colors.primaryEnd] as string[],
+      icon: 'document-text',
+      title: 'ATS Resume Scoring',
+      desc: 'Instant 0–100 rating with deep benchmark analysis',
+      tag: '0–100 ATS',
     },
     {
-      icon: 'checkmark-done-outline',
-      title: 'Role Match',
-      desc: 'Match skills to job roles',
-      gradient: ['#5B8266', '#4A7C59'] as string[],
+      icon: 'sparkles',
+      title: 'Job Role Match',
+      desc: 'Pinpoint skill gaps & align to target job roles',
+      tag: 'AI Match',
     },
     {
-      icon: 'chatbubbles-outline',
-      title: 'Mock Interview',
-      desc: 'Practice with AI interviewer',
-      gradient: ['#C27322', '#A35D16'] as string[],
+      icon: 'chatbubbles',
+      title: 'AI Mock Interview',
+      desc: 'Practice role-specific questions with live feedback',
+      tag: 'Gemini AI',
     },
   ];
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+    <View style={[styles.container, {backgroundColor: colors.bgDark}]}>
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor="transparent"
+        translucent
+      />
       <LinearGradient
         colors={[colors.bgDark, colors.gradientMiddle, colors.gradientEnd]}
         style={styles.gradient}>
-        {/* Decorative elements */}
-        <View
-          style={[
-            styles.decorCircle,
-            styles.decorCircle1,
-            {backgroundColor: colors.primaryStart},
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            {
+              paddingTop: Math.max(insets.top, 24) + SPACING.md,
+              paddingBottom: Math.max(insets.bottom, 16) + SPACING.sm,
+            },
           ]}
-        />
-        <View
-          style={[
-            styles.decorCircle,
-            styles.decorCircle2,
-            {backgroundColor: colors.accent},
-          ]}
-        />
-
-        {/* Content */}
-        <Animated.View
-          style={[
-            styles.content,
-            {opacity: fadeAnim, transform: [{translateY: slideAnim}]},
-          ]}>
-          {/* Header */}
-          <View style={styles.header}>
+          showsVerticalScrollIndicator={false}
+          bounces={false}>
+          {/* Main Top Content */}
+          <Animated.View
+            style={[
+              styles.mainContent,
+              {opacity: fadeAnim, transform: [{translateY: slideAnim}]},
+            ]}>
+            {/* Logo Badge Row */}
             <View style={styles.logoRow}>
               <LinearGradient
                 colors={[colors.primaryStart, colors.primaryEnd]}
-                style={styles.logoSmall}
+                style={styles.logoBadge}
                 start={{x: 0, y: 0}}
                 end={{x: 1, y: 1}}>
                 <Icon name="rocket" size={22} color="#FFFFFF" />
               </LinearGradient>
-              <Text style={[styles.logoText, {color: colors.textPrimary}]}>
-                PrepRole
+              <View style={styles.brandTextContainer}>
+                <Text style={[styles.logoTitle, {color: colors.textPrimary}]}>
+                  PrepRole
+                </Text>
+                <Text
+                  style={[
+                    styles.logoTagline,
+                    {color: colors.primaryStart},
+                  ]}>
+                  AI CAREER COACH
+                </Text>
+              </View>
+            </View>
+
+            {/* Hero Section */}
+            <View style={styles.heroSection}>
+              <Text style={[styles.heroTitle, {color: colors.textPrimary}]}>
+                Your AI-Powered{'\n'}
+                <Text
+                  style={[
+                    styles.heroHighlight,
+                    {color: colors.primaryStart},
+                  ]}>
+                  Career Coach
+                </Text>
+              </Text>
+              <Text
+                style={[
+                  styles.heroSubtitle,
+                  {color: colors.textSecondary},
+                ]}>
+                Upload your CV, get scored, and ace your interviews with
+                personalized AI preparation.
               </Text>
             </View>
 
-            <Text style={[styles.heroTitle, {color: colors.textPrimary}]}>
-              Your AI-Powered{'\n'}
-              <Text style={[styles.heroHighlight, {color: colors.primaryStart}]}>
-                Career Coach
-              </Text>
-            </Text>
-            <Text
-              style={[styles.heroSubtitle, {color: colors.textSecondary}]}>
-              Upload your CV, get scored, and ace your interviews with
-              personalized AI preparation.
-            </Text>
-          </View>
-
-          {/* Features */}
-          <View style={styles.features}>
-            {features.map((feature, index) => (
-              <Animated.View
-                key={index}
-                style={[
-                  styles.featureItem,
-                  {
-                    backgroundColor: colors.bgCard,
-                    borderColor: colors.border,
-                    shadowColor: colors.cardShadow,
-                    elevation: isDark ? 2 : 4,
-                    opacity: featureAnims[index],
-                    transform: [
+            {/* Features List */}
+            <View style={styles.featuresList}>
+              {features.map((feature, index) => (
+                <Animated.View
+                  key={index}
+                  style={[
+                    styles.featureItem,
+                    {
+                      backgroundColor: isDark
+                        ? 'rgba(28, 26, 24, 0.90)'
+                        : colors.bgCard,
+                      borderColor: isDark
+                        ? 'rgba(255, 255, 255, 0.07)'
+                        : colors.border,
+                      opacity: featureAnims[index],
+                      transform: [
+                        {
+                          translateX: featureAnims[index].interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-24, 0],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}>
+                  <View
+                    style={[
+                      styles.featureIconBox,
                       {
-                        translateX: featureAnims[index].interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [-30, 0],
-                        }),
+                        backgroundColor: isDark
+                          ? 'rgba(196, 154, 114, 0.12)'
+                          : 'rgba(166, 124, 82, 0.10)',
+                        borderColor: isDark
+                          ? 'rgba(196, 154, 114, 0.28)'
+                          : 'rgba(166, 124, 82, 0.22)',
                       },
-                    ],
-                  },
-                ]}>
-                <LinearGradient
-                  colors={feature.gradient}
-                  style={styles.featureIcon}
-                  start={{x: 0, y: 0}}
-                  end={{x: 1, y: 1}}>
-                  <Icon
-                    name={feature.icon}
-                    size={ICON_SIZES.lg}
-                    color="#FFFFFF"
-                  />
-                </LinearGradient>
-                <View style={styles.featureText}>
-                  <Text
-                    style={[
-                      styles.featureTitle,
-                      {color: colors.textPrimary},
                     ]}>
-                    {feature.title}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.featureDesc,
-                      {color: colors.textSecondary},
-                    ]}>
-                    {feature.desc}
-                  </Text>
-                </View>
-                <Icon
-                  name="chevron-forward"
-                  size={ICON_SIZES.md}
-                  color={colors.textMuted}
-                />
-              </Animated.View>
-            ))}
-          </View>
-        </Animated.View>
+                    <Icon
+                      name={feature.icon}
+                      size={ICON_SIZES.md + 2}
+                      color={colors.primaryStart}
+                    />
+                  </View>
 
-        {/* Sign In Button */}
-        <Animated.View
-          style={[styles.bottomSection, {transform: [{scale: buttonScale}]}]}>
-          <TouchableOpacity
-            style={[
-              styles.googleButton,
-              !isDark && {
-                borderWidth: 1,
-                borderColor: colors.border,
-                shadowColor: colors.cardShadow,
-                elevation: 4,
-              },
-            ]}
-            onPress={handleGoogleSignIn}
-            disabled={loading}
-            activeOpacity={0.85}>
-            <LinearGradient
-              colors={isDark ? ['#FFFFFF', '#F0F0F5'] : ['#FFFFFF', '#F8FAFC']}
-              style={styles.googleButtonGradient}
-              start={{x: 0, y: 0}}
-              end={{x: 0, y: 1}}>
+                  <View style={styles.featureText}>
+                    <View style={styles.featureHeaderRow}>
+                      <Text
+                        style={[
+                          styles.featureTitle,
+                          {color: colors.textPrimary},
+                        ]}>
+                        {feature.title}
+                      </Text>
+                      <View
+                        style={[
+                          styles.badgePill,
+                          {
+                            backgroundColor: isDark
+                              ? 'rgba(196, 154, 114, 0.10)'
+                              : 'rgba(166, 124, 82, 0.08)',
+                            borderColor: isDark
+                              ? 'rgba(196, 154, 114, 0.22)'
+                              : 'rgba(166, 124, 82, 0.18)',
+                          },
+                        ]}>
+                        <Text
+                          style={[
+                            styles.badgeText,
+                            {color: colors.primaryStart},
+                          ]}>
+                          {feature.tag}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text
+                      style={[
+                        styles.featureDesc,
+                        {color: colors.textSecondary},
+                      ]}>
+                      {feature.desc}
+                    </Text>
+                  </View>
+                </Animated.View>
+              ))}
+            </View>
+          </Animated.View>
+
+          {/* Bottom Section */}
+          <Animated.View
+            style={[styles.bottomSection, {transform: [{scale: buttonScale}]}]}>
+            <TouchableOpacity
+              style={styles.googleButton}
+              onPress={handleGoogleSignIn}
+              disabled={loading}
+              activeOpacity={0.88}>
               {loading ? (
-                <ActivityIndicator size="small" color={colors.primaryStart} />
+                <View style={styles.buttonLoadingRow}>
+                  <ActivityIndicator size="small" color="#1F1F1F" />
+                  <Text style={styles.loadingText}>Connecting...</Text>
+                </View>
               ) : (
                 <>
-                  <Text style={styles.googleIcon}>G</Text>
+                  <Image
+                    source={require('../assets/google_logo.png')}
+                    style={styles.googleLogo}
+                    resizeMode="contain"
+                  />
                   <Text style={styles.googleButtonText}>
                     Continue with Google
                   </Text>
                 </>
               )}
-            </LinearGradient>
-          </TouchableOpacity>
+            </TouchableOpacity>
 
-          <Text style={[styles.termsText, {color: colors.textMuted}]}>
-            By continuing, you agree to our{' '}
-            <Text style={[styles.termsLink, {color: colors.primaryStart}]}>
-              Terms
-            </Text>{' '}
-            &{' '}
-            <Text style={[styles.termsLink, {color: colors.primaryStart}]}>
-              Privacy Policy
+            <Text style={[styles.termsText, {color: colors.textMuted}]}>
+              By continuing, you agree to our{' '}
+              <Text style={[styles.termsLink, {color: colors.primaryStart}]}>
+                Terms
+              </Text>{' '}
+              &{' '}
+              <Text style={[styles.termsLink, {color: colors.primaryStart}]}>
+                Privacy Policy
+              </Text>
             </Text>
-          </Text>
-        </Animated.View>
+          </Animated.View>
+        </ScrollView>
       </LinearGradient>
     </View>
   );
@@ -302,145 +342,175 @@ const styles = StyleSheet.create({
   gradient: {
     flex: 1,
   },
-  decorCircle: {
+  ambientGlow: {
     position: 'absolute',
-    borderRadius: 999,
-    opacity: 0.05,
+    top: -height * 0.1,
+    alignSelf: 'center',
+    width: width * 0.95,
+    height: width * 0.95,
+    borderRadius: (width * 0.95) / 2,
+    opacity: 0.08,
   },
-  decorCircle1: {
-    width: width * 0.7,
-    height: width * 0.7,
-    backgroundColor: COLORS.primaryStart,
-    top: -width * 0.15,
-    right: -width * 0.2,
-  },
-  decorCircle2: {
-    width: width * 0.5,
-    height: width * 0.5,
-    backgroundColor: COLORS.accent,
-    bottom: height * 0.1,
-    left: -width * 0.2,
-  },
-  content: {
-    flex: 1,
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'space-between',
     paddingHorizontal: SPACING.lg,
-    paddingTop: height * 0.08,
   },
-  header: {
-    marginBottom: SPACING.xl,
+  mainContent: {
+    flex: 1,
   },
   logoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.lg,
   },
-  logoSmall: {
+  logoBadge: {
     width: 44,
     height: 44,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  logoText: {
+  brandTextContainer: {
+    marginLeft: SPACING.sm + 4,
+  },
+  logoTitle: {
     fontFamily: FONTS.bold,
-    fontSize: 22,
-    color: COLORS.textPrimary,
-    marginLeft: SPACING.sm,
+    fontSize: 21,
     letterSpacing: 0.5,
+    lineHeight: 25,
+  },
+  logoTagline: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 10,
+    letterSpacing: 1.2,
+  },
+  heroSection: {
+    marginBottom: SPACING.lg,
   },
   heroTitle: {
     fontFamily: FONTS.bold,
-    fontSize: 34,
-    color: COLORS.textPrimary,
-    lineHeight: 42,
-    marginBottom: SPACING.md,
+    fontSize: 31,
+    lineHeight: 39,
+    letterSpacing: -0.3,
+    marginBottom: SPACING.xs + 4,
   },
-  heroHighlight: {
-    color: COLORS.primaryStart,
-  },
+  heroHighlight: {},
   heroSubtitle: {
     fontFamily: FONTS.regular,
-    fontSize: 15,
-    color: COLORS.textSecondary,
+    fontSize: 14.5,
     lineHeight: 22,
   },
-  features: {
-    marginTop: SPACING.lg,
-    gap: SPACING.md,
+  featuresList: {
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.md,
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.bgCard,
     borderRadius: RADIUS.lg,
-    padding: SPACING.md,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    marginBottom: 11,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  featureIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: RADIUS.md,
+  featureIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   featureText: {
-    marginLeft: SPACING.md,
+    marginLeft: 13,
     flex: 1,
   },
+  featureHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   featureTitle: {
-    fontFamily: FONTS.bold,
-    fontSize: 16,
-    color: COLORS.textPrimary,
+    fontFamily: FONTS.semiBold,
+    fontSize: 14.5,
     marginBottom: 2,
+    letterSpacing: 0.1,
   },
   featureDesc: {
     fontFamily: FONTS.regular,
-    fontSize: 13,
-    color: COLORS.textSecondary,
+    fontSize: 12,
+    lineHeight: 16.5,
+  },
+  badgePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginLeft: 6,
+    alignSelf: 'center',
+  },
+  badgeText: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 10,
+    letterSpacing: 0.3,
   },
   bottomSection: {
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.xxl,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.xs,
   },
   googleButton: {
+    backgroundColor: '#FFFFFF',
+    height: 52,
     borderRadius: RADIUS.lg,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  googleButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: SPACING.lg,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    elevation: 6,
   },
-  googleIcon: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#4285F4',
-    marginRight: SPACING.sm,
+  googleLogo: {
+    width: 21,
+    height: 21,
+    marginRight: 11,
   },
   googleButtonText: {
     fontFamily: FONTS.semiBold,
-    fontSize: 16,
-    color: '#333333',
+    fontSize: 15.5,
+    color: '#1F1F1F',
+    letterSpacing: 0.2,
+  },
+  buttonLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontFamily: FONTS.medium,
+    fontSize: 14.5,
+    color: '#1F1F1F',
+    marginLeft: 10,
   },
   termsText: {
     fontFamily: FONTS.regular,
     fontSize: 12,
-    color: COLORS.textMuted,
     textAlign: 'center',
-    marginTop: SPACING.md,
+    marginTop: 13,
     lineHeight: 18,
   },
   termsLink: {
     fontFamily: FONTS.semiBold,
-    color: COLORS.primaryStart,
   },
 });
 

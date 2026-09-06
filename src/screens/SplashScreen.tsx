@@ -41,62 +41,73 @@ const SplashScreen = ({onFinish}: {onFinish: () => void}) => {
       ]),
     ).start();
 
-    // Main animation sequence
-    Animated.sequence([
-      // Logo appears with scale
-      Animated.parallel([
-        Animated.spring(logoScale, {
-          toValue: 1,
-          tension: 50,
-          friction: 7,
-          useNativeDriver: true,
-        }),
-        Animated.timing(logoOpacity, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-      ]),
-      // Title slides up
-      Animated.parallel([
-        Animated.timing(titleOpacity, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(titleTranslateY, {
-          toValue: 0,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-      ]),
-      // Subtitle fades in
-      Animated.timing(subtitleOpacity, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-      // Wait a moment
-      Animated.delay(800),
-    ]).start(() => {
-      onFinish();
-    });
-
     // Pulse animation for the logo icon
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
-          toValue: 1.08,
-          duration: 1000,
+          toValue: 1.06,
+          duration: 900,
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 1000,
+          duration: 900,
           useNativeDriver: true,
         }),
       ]),
     ).start();
+
+    // Main animation sequence
+    Animated.parallel([
+      // Logo appears with smooth spring & fade
+      Animated.parallel([
+        Animated.spring(logoScale, {
+          toValue: 1,
+          tension: 45,
+          friction: 6,
+          useNativeDriver: true,
+        }),
+        Animated.timing(logoOpacity, {
+          toValue: 1,
+          duration: 450,
+          useNativeDriver: true,
+        }),
+      ]),
+      // Title slides up smoothly
+      Animated.sequence([
+        Animated.delay(200),
+        Animated.parallel([
+          Animated.timing(titleOpacity, {
+            toValue: 1,
+            duration: 450,
+            useNativeDriver: true,
+          }),
+          Animated.timing(titleTranslateY, {
+            toValue: 0,
+            duration: 450,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
+      // Subtitle fades in
+      Animated.sequence([
+        Animated.delay(400),
+        Animated.timing(subtitleOpacity, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+
+    // Exactly 2 seconds (2000 ms) screen time before transitioning
+    const timer = setTimeout(() => {
+      onFinish();
+    }, 2000);
+
+    return () => {
+      clearTimeout(timer);
+    };
   }, [
     glowOpacity,
     logoOpacity,

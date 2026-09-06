@@ -98,6 +98,41 @@ export async function deleteAnalysis(id: string): Promise<boolean> {
   return true;
 }
 
+function decodeBase64ToArrayBuffer(base64: string): ArrayBuffer {
+  const chars =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const lookup = new Uint8Array(256);
+  for (let i = 0; i < chars.length; i++) {
+    lookup[chars.charCodeAt(i)] = i;
+  }
+
+  const len = base64.length;
+  let bufferLength = len * 0.75;
+  if (base64[len - 1] === '=') {
+    bufferLength--;
+    if (base64[len - 2] === '=') {
+      bufferLength--;
+    }
+  }
+
+  const arraybuffer = new ArrayBuffer(bufferLength);
+  const bytes = new Uint8Array(arraybuffer);
+
+  let p = 0;
+  for (let i = 0; i < len; i += 4) {
+    const encoded1 = lookup[base64.charCodeAt(i)];
+    const encoded2 = lookup[base64.charCodeAt(i + 1)];
+    const encoded3 = lookup[base64.charCodeAt(i + 2)];
+    const encoded4 = lookup[base64.charCodeAt(i + 3)];
+
+    bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
+    bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
+    bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
+  }
+
+  return arraybuffer;
+}
+
 /**
  * Uploads a physical resume file to Supabase Storage bucket 'resumes'
  */
@@ -111,12 +146,25 @@ export async function uploadResumeFile(
     const cleanFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
     const filePath = `${userId}/${Date.now()}_${cleanFileName}`;
 
-    const response = await fetch(fileUri);
-    const blob = await response.blob();
+    let uploadBody: any;
+    try {
+      const {getPdfBase64} = require('./pdfService');
+      const base64 = await getPdfBase64(fileUri);
+      if (base64) {
+        uploadBody = decodeBase64ToArrayBuffer(base64);
+      }
+    } catch {
+      // Fallback to fetch blob
+    }
+
+    if (!uploadBody) {
+      const response = await fetch(fileUri);
+      uploadBody = await response.blob();
+    }
 
     const {data, error} = await supabase.storage
       .from('resumes')
-      .upload(filePath, blob, {
+      .upload(filePath, uploadBody, {
         contentType: contentType || 'application/pdf',
         upsert: true,
       });
