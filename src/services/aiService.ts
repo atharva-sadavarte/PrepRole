@@ -1,4 +1,5 @@
 import {CVAnalysisResult, ScoreTier} from '../types/resume';
+import {supabase} from '../lib/supabase';
 import {GEMINI_API_KEY} from '../config/env';
 
 const GEMINI_MODEL = 'gemini-3.6-flash';
@@ -62,7 +63,10 @@ Scoring criteria:
 Be realistic, constructive, and highly specific in your rewrite recommendations so the user can immediately edit their CV.
 `;
 
-export async function analyzeCVWithAI({
+/**
+ * Direct Gemini API call used as an offline/local development fallback
+ */
+async function analyzeWithDirectGemini({
   cvText,
   pdfBase64,
   targetRole,
@@ -70,7 +74,6 @@ export async function analyzeCVWithAI({
 }: AnalyzeParams): Promise<CVAnalysisResult> {
   const parts: Array<any> = [];
 
-  // Add PDF inline data if provided
   if (pdfBase64) {
     parts.push({
       inlineData: {
@@ -80,7 +83,6 @@ export async function analyzeCVWithAI({
     });
   }
 
-  // Construct text prompt
   let userContent = `STRICT INSTRUCTION: Analyze ONLY the real candidate CV provided below or in the attached PDF document. Extract and address the candidate by their actual name in the executive summary. Do NOT hallucinate sample names like Alex Chen.\n\nTARGET JOB ROLE: ${targetRole}\n`;
   if (jobDescription && jobDescription.trim().length > 0) {
     userContent += `\nTARGET JOB DESCRIPTION:\n${jobDescription.trim()}\n`;
@@ -110,69 +112,122 @@ export async function analyzeCVWithAI({
     },
   };
 
+  const response = await fetch(GEMINI_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Gemini API Error:', errorText);
+    throw new Error(`Gemini API error (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json();
+  const candidate = data.candidates?.[0];
+  const text = candidate?.content?.parts?.[0]?.text;
+
+  if (!text) {
+    throw new Error('No analysis generated from AI model');
+  }
+
+  const parsed = JSON.parse(text);
+
+  let tier: ScoreTier = 'Competitive';
+  if (parsed.overall_score >= 85) tier = 'Strong Match';
+  else if (parsed.overall_score >= 70) tier = 'Competitive';
+  else if (parsed.overall_score >= 50) tier = 'Developing';
+  else tier = 'Needs Work';
+
+  return {
+    target_role: targetRole,
+    job_description: jobDescription,
+    overall_score: Math.min(100, Math.max(0, Math.round(parsed.overall_score || 0))),
+    score_tier: (parsed.score_tier as ScoreTier) || tier,
+    summary: parsed.summary || 'Resume analyzed against target role.',
+    breakdown: {
+      relevance: Math.min(100, Math.max(0, Math.round(parsed.breakdown?.relevance || 70))),
+      skills: Math.min(100, Math.max(0, Math.round(parsed.breakdown?.skills || 70))),
+      impact: Math.min(100, Math.max(0, Math.round(parsed.breakdown?.impact || 65))),
+      ats: Math.min(100, Math.max(0, Math.round(parsed.breakdown?.ats || 75))),
+    },
+    strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
+    improvements: Array.isArray(parsed.improvements)
+      ? parsed.improvements.map((imp: any, idx: number) => ({
+          id: imp.id || `imp-${idx + 1}`,
+          priority: imp.priority || 'medium',
+          section: imp.section || 'General',
+          title: imp.title || 'Improve CV bullet points',
+          description: imp.description || '',
+          example: imp.example,
+          completed: false,
+        }))
+      : [],
+    skills_matched: Array.isArray(parsed.skills_matched) ? parsed.skills_matched : [],
+    skills_missing: Array.isArray(parsed.skills_missing) ? parsed.skills_missing : [],
+  };
+}
+
+/**
+ * Main function to analyze candidate CV against target role.
+ * Routes through the secure Supabase Edge Function 'analyze-cv' (API key in Supabase Secrets).
+ */
+export async function analyzeCVWithAI({
+  cvText,
+  pdfBase64,
+  targetRole,
+  jobDescription,
+}: AnalyzeParams): Promise<CVAnalysisResult> {
   try {
-    const response = await fetch(GEMINI_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    // Primary: Call the secure Supabase Edge Function 'analyze-cv'
+    const {data, error} = await supabase.functions.invoke('analyze-cv', {
+      body: {
+        cvText,
+        pdfBase64,
+        targetRole,
+        jobDescription,
       },
-      body: JSON.stringify(requestBody),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Gemini API Error:', errorText);
-      throw new Error(`Gemini API error (${response.status}): ${errorText}`);
+    if (error) {
+      console.warn('Supabase Edge Function error:', error);
+      // Fallback: If edge function fails and local key exists, try direct
+      if (GEMINI_API_KEY) {
+        console.warn('Falling back to direct Gemini API call...');
+        return await analyzeWithDirectGemini({
+          cvText,
+          pdfBase64,
+          targetRole,
+          jobDescription,
+        });
+      }
+      throw new Error(error.message || 'Failed to analyze CV with AI');
     }
 
-    const data = await response.json();
-    const candidate = data.candidates?.[0];
-    const text = candidate?.content?.parts?.[0]?.text;
-
-    if (!text) {
-      throw new Error('No analysis generated from AI model');
+    if (!data || typeof data.overall_score !== 'number') {
+      throw new Error('Invalid analysis response received from server.');
     }
 
-    const parsed = JSON.parse(text);
-
-    // Validate and sanitize score tier
-    let tier: ScoreTier = 'Competitive';
-    if (parsed.overall_score >= 85) tier = 'Strong Match';
-    else if (parsed.overall_score >= 70) tier = 'Competitive';
-    else if (parsed.overall_score >= 50) tier = 'Developing';
-    else tier = 'Needs Work';
-
-    const result: CVAnalysisResult = {
-      target_role: targetRole,
-      job_description: jobDescription,
-      overall_score: Math.min(100, Math.max(0, Math.round(parsed.overall_score || 0))),
-      score_tier: (parsed.score_tier as ScoreTier) || tier,
-      summary: parsed.summary || 'Resume analyzed against target role.',
-      breakdown: {
-        relevance: Math.min(100, Math.max(0, Math.round(parsed.breakdown?.relevance || 70))),
-        skills: Math.min(100, Math.max(0, Math.round(parsed.breakdown?.skills || 70))),
-        impact: Math.min(100, Math.max(0, Math.round(parsed.breakdown?.impact || 65))),
-        ats: Math.min(100, Math.max(0, Math.round(parsed.breakdown?.ats || 75))),
-      },
-      strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
-      improvements: Array.isArray(parsed.improvements)
-        ? parsed.improvements.map((imp: any, idx: number) => ({
-            id: imp.id || `imp-${idx + 1}`,
-            priority: imp.priority || 'medium',
-            section: imp.section || 'General',
-            title: imp.title || 'Improve CV bullet points',
-            description: imp.description || '',
-            example: imp.example,
-            completed: false,
-          }))
-        : [],
-      skills_matched: Array.isArray(parsed.skills_matched) ? parsed.skills_matched : [],
-      skills_missing: Array.isArray(parsed.skills_missing) ? parsed.skills_missing : [],
-    };
-
-    return result;
+    return data as CVAnalysisResult;
   } catch (error: any) {
+    if (GEMINI_API_KEY && !error.message?.includes('direct Gemini')) {
+      try {
+        console.warn('Attempting fallback to direct Gemini API call...');
+        return await analyzeWithDirectGemini({
+          cvText,
+          pdfBase64,
+          targetRole,
+          jobDescription,
+        });
+      } catch (fallbackErr) {
+        console.error('Direct fallback also failed:', fallbackErr);
+      }
+    }
     console.error('Error analyzing CV:', error);
     throw error;
   }
 }
+
