@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Image,
   ScrollView,
+  Alert,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -81,12 +82,19 @@ const AuthScreen = () => {
   const handleGoogleSignIn = async () => {
     try {
       setLoading(true);
-      await GoogleSignin.hasPlayServices();
+      await GoogleSignin.hasPlayServices({showPlayServicesUpdateDialog: true});
       const response = await GoogleSignin.signIn();
+
+      // In @react-native-google-signin/google-signin v13+, cancellation is returned in response
+      if (response.type === 'cancelled') {
+        console.log('Google Sign-In cancelled by user');
+        return;
+      }
+
       const idToken = response?.data?.idToken;
 
       if (!idToken) {
-        throw new Error('No ID token received from Google');
+        throw new Error('No ID token received from Google. Please verify webClientId configuration.');
       }
 
       const {error} = await supabase.auth.signInWithIdToken({
@@ -96,16 +104,29 @@ const AuthScreen = () => {
 
       if (error) {
         console.error('Supabase auth error:', error.message);
+        Alert.alert('Authentication Failed', error.message);
       }
     } catch (error: any) {
+      console.error('Google Sign-In Error:', error);
       if (error.code === statusCodes.SIGN_IN_CANCELLED) {
         console.log('Sign in cancelled');
       } else if (error.code === statusCodes.IN_PROGRESS) {
         console.log('Sign in already in progress');
       } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-        console.log('Play services not available');
+        Alert.alert(
+          'Google Play Services Required',
+          'Google Play Services is not available or needs to be updated on your device.',
+        );
+      } else if (String(error.code) === '10') {
+        Alert.alert(
+          'Google Play Config Error (10)',
+          'DEVELOPER_ERROR (Code 10):\n\nThe SHA-1 fingerprint for this build (e.g. Google Play App Signing key or release keystore) has not been added to Google Cloud Console for package "com.preprole".',
+        );
       } else {
-        console.error('Google Sign-In Error:', error);
+        Alert.alert(
+          'Sign-In Failed',
+          error?.message || `Error code: ${error?.code || 'unknown'}`,
+        );
       }
     } finally {
       setLoading(false);
@@ -135,11 +156,7 @@ const AuthScreen = () => {
 
   return (
     <View style={[styles.container, {backgroundColor: colors.bgDark}]}>
-      <StatusBar
-        barStyle={isDark ? 'light-content' : 'dark-content'}
-        backgroundColor="transparent"
-        translucent
-      />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <LinearGradient
         colors={[colors.bgDark, colors.gradientMiddle, colors.gradientEnd]}
         style={styles.gradient}>

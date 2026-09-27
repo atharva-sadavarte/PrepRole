@@ -45,6 +45,8 @@ export interface CVAnalysisResult {
   improvements: CVImprovement[];
   skills_matched: string[];
   skills_missing: string[];
+  credits_remaining?: number;
+  plan_type?: 'free' | 'pro';
   created_at?: string;
 }
 
@@ -52,4 +54,14 @@ export interface ResumeAnalysisRecord extends CVAnalysisResult {
   id: string;
   user_id: string;
   created_at: string;
+}
+
+export interface UserQuota {
+  user_id: string;
+  plan_type: 'free' | 'pro';
+  credits_remaining: number;
+  lifetime_scans_used: number;
+  pro_until?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }

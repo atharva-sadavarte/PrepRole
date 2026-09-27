@@ -16,6 +16,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import SplashScreen from './src/screens/SplashScreen';
 import type {Session} from '@supabase/supabase-js';
 import {ThemeProvider, useTheme} from './src/context/ThemeContext';
+import {QuotaProvider} from './src/context/QuotaContext';
+import {initPurchases} from './src/services/purchaseService';
 
 function AppNavigation({
   session,
@@ -84,6 +86,9 @@ function App() {
     // Check for existing session
     supabase.auth.getSession().then(({data: {session: currentSession}}) => {
       setSession(currentSession);
+      if (currentSession?.user?.id) {
+        initPurchases(currentSession.user.id);
+      }
       setLoading(false);
     });
 
@@ -92,6 +97,9 @@ function App() {
       data: {subscription},
     } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
+      if (newSession?.user?.id) {
+        initPurchases(newSession.user.id);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -113,13 +121,15 @@ function App() {
   return (
     <ThemeProvider>
       <SafeAreaProvider>
-        <AppNavigation
-          session={session}
-          showSplash={showSplash}
-          handleSplashFinish={handleSplashFinish}
-          hasCompletedOnboarding={hasCompletedOnboarding}
-          handleFinishOnboarding={handleFinishOnboarding}
-        />
+        <QuotaProvider session={session}>
+          <AppNavigation
+            session={session}
+            showSplash={showSplash}
+            handleSplashFinish={handleSplashFinish}
+            hasCompletedOnboarding={hasCompletedOnboarding}
+            handleFinishOnboarding={handleFinishOnboarding}
+          />
+        </QuotaProvider>
       </SafeAreaProvider>
     </ThemeProvider>
   );

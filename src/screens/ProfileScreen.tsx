@@ -19,6 +19,9 @@ import {supabase} from '../lib/supabase';
 import {useTheme} from '../context/ThemeContext';
 import {COLORS, SPACING, RADIUS, ICON_SIZES, FONTS, SHADOWS} from '../lib/theme';
 import {getUserAnalyses} from '../services/resumeService';
+import {restorePurchases} from '../services/purchaseService';
+import {useQuota} from '../context/QuotaContext';
+import PaywallModal from '../components/PaywallModal';
 import Icon from '../components/Icon';
 import OnboardingScreen from './OnboardingScreen';
 import type {Session} from '@supabase/supabase-js';
@@ -32,6 +35,16 @@ interface ProfileScreenProps {
 
 const ProfileScreen = ({session}: ProfileScreenProps) => {
   const {colors, isDark, themeSetting, setThemeSetting} = useTheme();
+  const {
+    quota,
+    isPro,
+    creditsRemaining,
+    refreshQuota,
+    showPaywall,
+    paywallReason,
+    openPaywall,
+    closePaywall,
+  } = useQuota();
   const [totalScans, setTotalScans] = useState(0);
   const [bestScore, setBestScore] = useState(0);
   const [avgScore, setAvgScore] = useState(0);
@@ -132,6 +145,26 @@ const ProfileScreen = ({session}: ProfileScreenProps) => {
     }
   };
 
+  const handleRestorePurchases = async () => {
+    try {
+      const info = await restorePurchases();
+      await refreshQuota();
+      if (info?.entitlements?.active?.pro) {
+        Alert.alert(
+          'Subscription Restored',
+          'Your PrepRole Pro membership has been successfully restored! You now have unlimited scans.',
+        );
+      } else {
+        Alert.alert(
+          'No Active Subscription',
+          'No active Pro subscriptions were found for this Google Play account.',
+        );
+      }
+    } catch (err: any) {
+      Alert.alert('Restore Error', err?.message || 'Could not restore purchases.');
+    }
+  };
+
   const statItems = [
     {
       icon: 'analytics-outline',
@@ -163,20 +196,49 @@ const ProfileScreen = ({session}: ProfileScreenProps) => {
       onPress: () => setShowTourModal(true),
     },
     {
+      icon: 'refresh-outline',
+      label: 'Restore Purchases',
+      onPress: handleRestorePurchases,
+    },
+    {
       icon: 'shield-checkmark-outline',
       label: 'Privacy Policy',
-      onPress: () => {},
+      onPress: () => {
+        Alert.alert(
+          'Privacy Policy',
+          'PrepRole respects your privacy. Your uploaded resumes and generated evaluations are encrypted and strictly protected. We do not sell or share personal data.',
+        );
+      },
     },
     {
       icon: 'document-text-outline',
       label: 'Terms of Service',
-      onPress: () => {},
+      onPress: () => {
+        Alert.alert(
+          'Terms of Service',
+          'By using PrepRole, you agree to our standard terms of use. Subscription billing is managed securely via Google Play.',
+        );
+      },
     },
-    {icon: 'help-circle-outline', label: 'Help & Support', onPress: () => {}},
+    {
+      icon: 'help-circle-outline',
+      label: 'Help & Support',
+      onPress: () => {
+        Alert.alert(
+          'Help & Support',
+          'Have questions, feedback, or need help? Reach out to support at support@preprole.com.',
+        );
+      },
+    },
     {
       icon: 'information-circle-outline',
       label: 'About PrepRole',
-      onPress: () => {},
+      onPress: () => {
+        Alert.alert(
+          'About PrepRole',
+          'PrepRole v1.0.0\nAI-powered career coaching & ATS resume optimization platform.',
+        );
+      },
     },
   ];
 
@@ -293,24 +355,54 @@ const ProfileScreen = ({session}: ProfileScreenProps) => {
               {userEmail}
             </Text>
 
-            {/* Member badge */}
-            <View
-              style={[
-                styles.memberBadge,
-                {
-                  backgroundColor: colors.accentSoft,
-                  borderColor: colors.border,
-                },
-              ]}>
-              <Icon
-                name="diamond-outline"
-                size={ICON_SIZES.sm}
-                color={colors.accent}
-              />
-              <Text style={[styles.memberText, {color: colors.accent}]}>
-                Free Plan
-              </Text>
-            </View>
+            {/* Dynamic Member badge */}
+            {isPro ? (
+              <View
+                style={[
+                  styles.memberBadge,
+                  {
+                    backgroundColor: 'rgba(196, 154, 114, 0.16)',
+                    borderColor: colors.primaryStart,
+                  },
+                ]}>
+                <Icon
+                  name="diamond"
+                  size={ICON_SIZES.sm}
+                  color={colors.primaryStart}
+                />
+                <Text
+                  style={[
+                    styles.memberText,
+                    {color: colors.primaryStart, fontWeight: '700'},
+                  ]}>
+                  PrepRole Pro Member
+                </Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() =>
+                  openPaywall(
+                    creditsRemaining === 0 ? 'out_of_credits' : 'upgrade',
+                  )
+                }
+                style={[
+                  styles.memberBadge,
+                  {
+                    backgroundColor: colors.accentSoft,
+                    borderColor: colors.border,
+                  },
+                ]}>
+                <Icon
+                  name="sparkles"
+                  size={ICON_SIZES.sm}
+                  color={colors.accent}
+                />
+                <Text style={[styles.memberText, {color: colors.accent}]}>
+                  Free Plan • {creditsRemaining === 1 ? '1 Scan Left' : `${creditsRemaining} Scans Left`}
+                </Text>
+              </TouchableOpacity>
+            )}
           </Animated.View>
 
           {/* Stats Grid */}
@@ -360,6 +452,180 @@ const ProfileScreen = ({session}: ProfileScreenProps) => {
               </View>
             ))}
           </View>
+
+          {/* Subscription Tier Card */}
+          {!isPro ? (
+            <View
+              style={[
+                styles.planSectionCard,
+                {
+                  backgroundColor: colors.bgCard,
+                  borderColor: colors.primaryStart,
+                  shadowColor: colors.cardShadow,
+                },
+              ]}>
+              <View style={styles.planSectionHeader}>
+                <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                  <LinearGradient
+                    colors={[colors.primaryStart, colors.primaryEnd]}
+                    style={styles.planCrownIcon}
+                    start={{x: 0, y: 0}}
+                    end={{x: 1, y: 1}}>
+                    <Icon name="diamond" size={16} color="#FFFFFF" />
+                  </LinearGradient>
+                  <View style={{marginLeft: SPACING.sm}}>
+                    <Text
+                      style={[
+                        styles.planCardTitle,
+                        {color: colors.textPrimary},
+                      ]}>
+                      PrepRole Pro
+                    </Text>
+                    <Text
+                      style={[
+                        styles.planCardSubtitle,
+                        {color: colors.textSecondary},
+                      ]}>
+                      {creditsRemaining === 0
+                        ? '0 scans left • Upgrade for unlimited'
+                        : `${creditsRemaining} free scans remaining`}
+                    </Text>
+                  </View>
+                </View>
+                <View
+                  style={[
+                    styles.freeTierBadge,
+                    {
+                      backgroundColor: colors.accentSoft,
+                      borderColor: colors.border,
+                    },
+                  ]}>
+                  <Text
+                    style={[styles.freeTierBadgeText, {color: colors.accent}]}>
+                    FREE PLAN
+                  </Text>
+                </View>
+              </View>
+
+              <Text
+                style={[styles.planBenefitsText, {color: colors.textSecondary}]}>
+                Upgrade to Pro for unlimited ATS resume evaluations, target role
+                diagnostics, and tailored bullet rewrites.
+              </Text>
+
+              <TouchableOpacity
+                activeOpacity={0.88}
+                onPress={() =>
+                  openPaywall(
+                    creditsRemaining === 0 ? 'out_of_credits' : 'upgrade',
+                  )
+                }
+                style={styles.upgradeCtaButton}>
+                <LinearGradient
+                  colors={[colors.primaryStart, colors.primaryEnd]}
+                  style={styles.upgradeCtaGradient}
+                  start={{x: 0, y: 0}}
+                  end={{x: 1, y: 0}}>
+                  <Icon
+                    name="diamond"
+                    size={16}
+                    color="#FFFFFF"
+                    style={{marginRight: 6}}
+                  />
+                  <Text style={styles.upgradeCtaText}>
+                    Upgrade to Pro — $4.99/mo
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View
+              style={[
+                styles.planSectionCard,
+                {
+                  backgroundColor: colors.bgCard,
+                  borderColor: isDark
+                    ? 'rgba(196, 154, 114, 0.4)'
+                    : colors.primaryStart,
+                  shadowColor: colors.cardShadow,
+                },
+              ]}>
+              <View style={styles.planSectionHeader}>
+                <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                  <LinearGradient
+                    colors={[colors.primaryStart, colors.primaryEnd]}
+                    style={styles.planCrownIcon}
+                    start={{x: 0, y: 0}}
+                    end={{x: 1, y: 1}}>
+                    <Icon name="diamond" size={16} color="#FFFFFF" />
+                  </LinearGradient>
+                  <View style={{marginLeft: SPACING.sm}}>
+                    <Text
+                      style={[
+                        styles.planCardTitle,
+                        {color: colors.textPrimary},
+                      ]}>
+                      PrepRole Pro
+                    </Text>
+                    <Text
+                      style={[
+                        styles.planCardSubtitle,
+                        {color: colors.primaryStart},
+                      ]}>
+                      Active Membership • Unlimited Scans
+                    </Text>
+                  </View>
+                </View>
+                <View
+                  style={[
+                    styles.freeTierBadge,
+                    {
+                      backgroundColor: 'rgba(196, 154, 114, 0.16)',
+                      borderColor: colors.primaryStart,
+                    },
+                  ]}>
+                  <Text
+                    style={[
+                      styles.freeTierBadgeText,
+                      {color: colors.primaryStart, fontWeight: '700'},
+                    ]}>
+                    PRO ACTIVE
+                  </Text>
+                </View>
+              </View>
+
+              <Text
+                style={[styles.planBenefitsText, {color: colors.textSecondary}]}>
+                You have active unlimited access to all AI resume benchmarks,
+                keyword gap diagnostics, and interview drills.
+              </Text>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => openPaywall('pro_info')}
+                style={[
+                  styles.manageSubButton,
+                  {
+                    backgroundColor: colors.bgCardLight,
+                    borderColor: colors.border,
+                  },
+                ]}>
+                <Icon
+                  name="shield-checkmark"
+                  size={15}
+                  color={colors.primaryStart}
+                  style={{marginRight: 6}}
+                />
+                <Text
+                  style={[
+                    styles.manageSubButtonText,
+                    {color: colors.textPrimary},
+                  ]}>
+                  Subscription Details
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Appearance / Theme Selector Section */}
           <View
@@ -619,6 +885,16 @@ const ProfileScreen = ({session}: ProfileScreenProps) => {
           isModalMode={true}
         />
       </Modal>
+
+      {/* Paywall & Subscription Modal */}
+      <PaywallModal
+        visible={showPaywall}
+        currentCredits={creditsRemaining}
+        isPro={isPro}
+        reason={paywallReason}
+        onClose={closePaywall}
+        onSuccess={refreshQuota}
+      />
     </View>
   );
 };
@@ -979,6 +1255,81 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bold,
     fontSize: 14,
     color: '#FFFFFF',
+  },
+  planSectionCard: {
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    borderWidth: 1,
+    marginBottom: SPACING.lg,
+  },
+  planSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.xs,
+  },
+  planCrownIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  planCardTitle: {
+    fontFamily: FONTS.bold,
+    fontSize: 15,
+  },
+  planCardSubtitle: {
+    fontFamily: FONTS.medium,
+    fontSize: 11,
+    marginTop: 1,
+  },
+  freeTierBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+  },
+  freeTierBadgeText: {
+    fontFamily: FONTS.bold,
+    fontSize: 9.5,
+    letterSpacing: 0.5,
+  },
+  planBenefitsText: {
+    fontFamily: FONTS.regular,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.md,
+  },
+  upgradeCtaButton: {
+    borderRadius: RADIUS.md,
+    overflow: 'hidden',
+  },
+  upgradeCtaGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: SPACING.md,
+  },
+  upgradeCtaText: {
+    color: '#FFFFFF',
+    fontFamily: FONTS.bold,
+    fontSize: 13,
+  },
+  manageSubButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+  },
+  manageSubButtonText: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 12.5,
   },
 });
 

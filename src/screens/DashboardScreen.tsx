@@ -9,12 +9,15 @@ import {
   StatusBar,
   ScrollView,
   Image,
+  Alert,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {useTheme} from '../context/ThemeContext';
 import {COLORS, SPACING, RADIUS, ICON_SIZES, FONTS} from '../lib/theme';
 import {getUserAnalyses} from '../services/resumeService';
 import {ResumeAnalysisRecord} from '../types/resume';
+import {useQuota} from '../context/QuotaContext';
+import PaywallModal from '../components/PaywallModal';
 import Icon from '../components/Icon';
 import type {Session} from '@supabase/supabase-js';
 
@@ -27,9 +30,20 @@ interface DashboardScreenProps {
 
 const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
   const {colors, isDark} = useTheme();
+  const {
+    quota,
+    isPro,
+    creditsRemaining,
+    refreshQuota,
+    showPaywall,
+    paywallReason,
+    openPaywall,
+    closePaywall,
+  } = useQuota();
   const [recentScans, setRecentScans] = useState<ResumeAnalysisRecord[]>([]);
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(24)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
   const cardAnims = useRef([
     new Animated.Value(0),
     new Animated.Value(0),
@@ -46,9 +60,10 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
     const fetchScans = async () => {
       try {
         const scans = await getUserAnalyses(session.user.id);
-        setRecentScans(scans.slice(0, 3));
+        setRecentScans(scans);
+        refreshQuota();
       } catch (err) {
-        console.error('Error fetching dashboard scans:', err);
+        console.error('Error fetching dashboard data:', err);
       }
     };
     fetchScans();
@@ -163,15 +178,65 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
               <Text style={[styles.brandPillText, {color: colors.textPrimary}]}>
                 PrepRole AI
               </Text>
-              <View
-                style={[
-                  styles.activeBadgePill,
-                  {backgroundColor: colors.accentSoft},
-                ]}>
-                <Text style={[styles.activeBadgeText, {color: colors.accent}]}>
-                  PRO
-                </Text>
-              </View>
+              {isPro ? (
+                <View
+                  style={[
+                    styles.activeBadgePill,
+                    {
+                      backgroundColor: 'rgba(196, 154, 114, 0.16)',
+                      borderColor: colors.primaryStart,
+                      borderWidth: 1,
+                    },
+                  ]}>
+                  <Icon
+                    name="diamond"
+                    size={10}
+                    color={colors.primaryStart}
+                    style={{marginRight: 3}}
+                  />
+                  <Text
+                    style={[
+                      styles.activeBadgeText,
+                      {color: colors.primaryStart, fontWeight: '700'},
+                    ]}>
+                    PRO
+                  </Text>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() =>
+                    openPaywall(
+                      creditsRemaining === 0 ? 'out_of_credits' : 'upgrade',
+                    )
+                  }
+                  style={[
+                    styles.activeBadgePill,
+                    {
+                      backgroundColor:
+                        creditsRemaining === 0
+                          ? 'rgba(194, 89, 83, 0.12)'
+                          : colors.accentSoft,
+                      borderColor:
+                        creditsRemaining === 0 ? colors.error : colors.border,
+                      borderWidth: 1,
+                    },
+                  ]}>
+                  <Text
+                    style={[
+                      styles.activeBadgeText,
+                      {
+                        color:
+                          creditsRemaining === 0
+                            ? colors.error
+                            : colors.accent,
+                        fontWeight: '700',
+                      },
+                    ]}>
+                    {creditsRemaining === 0 ? 'GET PRO' : 'FREE'}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* Profile Avatar / Quick Nav */}
@@ -291,29 +356,72 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
               </View>
 
               {/* Metric 3: Target Role / Tier */}
-              <View
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  if (isPro) {
+                    Alert.alert(
+                      'PrepRole Pro Active',
+                      'You have an active Pro subscription with unlimited resume scans, advanced ATS scoring, and interview drills.',
+                      [
+                        {
+                          text: 'Subscription Details',
+                          onPress: () => openPaywall('pro_info'),
+                        },
+                        {text: 'Awesome', style: 'default'},
+                      ],
+                    );
+                  } else {
+                    openPaywall(
+                      creditsRemaining === 0 ? 'out_of_credits' : 'upgrade',
+                    );
+                  }
+                }}
                 style={[
                   styles.metricCard,
                   {
                     backgroundColor: colors.bgCard,
-                    borderColor: colors.border,
+                    borderColor: isPro ? colors.primaryStart : colors.border,
                     shadowColor: colors.cardShadow,
                   },
                 ]}>
                 <View
                   style={[
                     styles.metricIconBg,
-                    {backgroundColor: 'rgba(217, 130, 43, 0.14)'},
+                    {
+                      backgroundColor: isPro
+                        ? 'rgba(196, 154, 114, 0.16)'
+                        : 'rgba(217, 130, 43, 0.14)',
+                    },
                   ]}>
-                  <Icon name="diamond-outline" size={16} color="#D9822B" />
+                  <Icon
+                    name={isPro ? 'diamond' : 'flash'}
+                    size={16}
+                    color={isPro ? colors.primaryStart : '#D9822B'}
+                  />
                 </View>
-                <Text style={[styles.metricValue, {color: colors.textPrimary}]}>
-                  Free
+                <Text
+                  style={[
+                    styles.metricValue,
+                    {
+                      color: isPro ? colors.primaryStart : colors.textPrimary,
+                    },
+                  ]}>
+                  {isPro
+                    ? 'PRO'
+                    : creditsRemaining === 0
+                    ? '0 Left'
+                    : `${creditsRemaining} Left`}
                 </Text>
-                <Text style={[styles.metricLabel, {color: colors.textSecondary}]}>
-                  Plan Level
+                <Text
+                  style={[styles.metricLabel, {color: colors.textSecondary}]}>
+                  {isPro
+                    ? 'Unlimited'
+                    : creditsRemaining === 1
+                    ? 'Free Scan'
+                    : 'Free Scans'}
                 </Text>
-              </View>
+              </TouchableOpacity>
             </View>
 
             {/* Spotlight Banner Card */}
@@ -404,6 +512,87 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                 </TouchableOpacity>
               </View>
             </View>
+
+            {/* Dynamic Pro / Free Callout Banner */}
+            {!isPro && creditsRemaining <= 1 && (
+              <TouchableOpacity
+                activeOpacity={0.88}
+                onPress={() =>
+                  openPaywall(
+                    creditsRemaining === 0 ? 'out_of_credits' : 'upgrade',
+                  )
+                }
+                style={[
+                  styles.upgradeBannerCard,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(196, 154, 114, 0.12)'
+                      : '#FDF7F0',
+                    borderColor: colors.primaryStart,
+                  },
+                ]}>
+                <View style={styles.upgradeBannerLeft}>
+                  <LinearGradient
+                    colors={[colors.primaryStart, colors.primaryEnd]}
+                    style={styles.upgradeBannerIcon}>
+                    <Icon name="diamond" size={16} color="#FFFFFF" />
+                  </LinearGradient>
+                  <View style={{flex: 1, marginLeft: SPACING.sm}}>
+                    <Text
+                      style={[
+                        styles.upgradeBannerTitle,
+                        {color: colors.textPrimary},
+                      ]}>
+                      {creditsRemaining === 0
+                        ? 'Free scans limit reached'
+                        : 'Running low on free scans?'}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.upgradeBannerSubtitle,
+                        {color: colors.textSecondary},
+                      ]}>
+                      Upgrade to Pro for unlimited resume evaluations & AI coaching.
+                    </Text>
+                  </View>
+                </View>
+                <View
+                  style={[
+                    styles.upgradeBannerBtn,
+                    {backgroundColor: colors.primaryStart},
+                  ]}>
+                  <Text style={styles.upgradeBannerBtnText}>Upgrade</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+
+            {isPro && (
+              <View
+                style={[
+                  styles.proStatusStrip,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(196, 154, 114, 0.10)'
+                      : '#F9F5EF',
+                    borderColor: isDark
+                      ? 'rgba(196, 154, 114, 0.25)'
+                      : 'rgba(196, 154, 114, 0.35)',
+                  },
+                ]}>
+                <Icon
+                  name="shield-checkmark"
+                  size={15}
+                  color={colors.primaryStart}
+                />
+                <Text
+                  style={[
+                    styles.proStatusStripText,
+                    {color: colors.primaryStart},
+                  ]}>
+                  PrepRole Pro Member • Unlimited ATS Scans Active
+                </Text>
+              </View>
+            )}
           </Animated.View>
 
           {/* Tools & Accelerators Section */}
@@ -413,7 +602,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                 Career Tools
               </Text>
               <Text style={[styles.sectionSubheading, {color: colors.textSecondary}]}>
-                AI-assisted interview & resume suite
+                AI-assisted resume & interview preparation suite
               </Text>
             </View>
 
@@ -793,6 +982,16 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
           </View>
         </ScrollView>
       </LinearGradient>
+
+      {/* Paywall & Subscription Modal */}
+      <PaywallModal
+        visible={showPaywall}
+        currentCredits={creditsRemaining}
+        isPro={isPro}
+        reason={paywallReason}
+        onClose={closePaywall}
+        onSuccess={refreshQuota}
+      />
     </View>
   );
 };
@@ -1245,6 +1444,63 @@ const styles = StyleSheet.create({
   emptyCardDesc: {
     fontFamily: FONTS.regular,
     fontSize: 11,
+  },
+  upgradeBannerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: SPACING.md,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    marginTop: SPACING.md,
+  },
+  upgradeBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: SPACING.sm,
+  },
+  upgradeBannerIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  upgradeBannerTitle: {
+    fontFamily: FONTS.bold,
+    fontSize: 13,
+    marginBottom: 2,
+  },
+  upgradeBannerSubtitle: {
+    fontFamily: FONTS.regular,
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  upgradeBannerBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: RADIUS.md,
+  },
+  upgradeBannerBtnText: {
+    color: '#FFFFFF',
+    fontFamily: FONTS.bold,
+    fontSize: 12,
+  },
+  proStatusStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    marginTop: SPACING.md,
+    gap: 6,
+  },
+  proStatusStripText: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 12,
   },
 });
 

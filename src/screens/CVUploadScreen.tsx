@@ -26,6 +26,8 @@ import {
 import {getPdfBase64} from '../services/pdfService';
 import Icon from '../components/Icon';
 import PdfPreviewModal from '../components/PdfPreviewModal';
+import PaywallModal from '../components/PaywallModal';
+import {useQuota} from '../context/QuotaContext';
 import type {Session} from '@supabase/supabase-js';
 
 interface CVUploadScreenProps {
@@ -44,11 +46,11 @@ const POPULAR_ROLES = [
 ];
 
 const LOADING_STEPS = [
-  'Scanning CV content & structure...',
-  'Benchmarking skills against role...',
+  'Reading resume structure & content...',
+  'Benchmarking qualifications against target role...',
   'Evaluating quantifiable metrics & impact...',
-  'Assessing ATS readability & keywords...',
-  'Crafting personalized improvement plan...',
+  'Checking ATS readability & keyword density...',
+  'Crafting personalized improvement recommendations...',
 ];
 
 export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
@@ -56,6 +58,16 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
   navigation,
 }) => {
   const {colors, isDark} = useTheme();
+  const {
+    quota,
+    isPro,
+    creditsRemaining,
+    refreshQuota,
+    showPaywall,
+    paywallReason,
+    openPaywall,
+    closePaywall,
+  } = useQuota();
   const [targetRole, setTargetRole] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [showJDInput, setShowJDInput] = useState(false);
@@ -77,12 +89,13 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    refreshQuota();
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 400,
       useNativeDriver: true,
     }).start();
-  }, [fadeAnim]);
+  }, [fadeAnim, refreshQuota]);
 
   // Cycle loading messages
   useEffect(() => {
@@ -174,18 +187,42 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
   };
 
   const handleAnalyze = async () => {
-    if (!targetRole.trim()) {
-      Alert.alert('Required Field', 'Please specify your target job role.');
+    if (!isPro && creditsRemaining <= 0) {
+      Alert.alert(
+        'No Scans Remaining',
+        'You have used all your free resume scans. Upgrade to PrepRole Pro to get unlimited scans, role-tailored ATS feedback, and interview drills.',
+        [
+          {text: 'Upgrade to Pro', onPress: () => openPaywall('out_of_credits')},
+          {text: 'Cancel', style: 'cancel'},
+        ],
+      );
       return;
     }
 
-    const hasPastedText = pastedText.trim().length > 50;
+    if (!targetRole.trim()) {
+      Alert.alert(
+        'Target Role Required',
+        'Please enter the job title you want to benchmark your resume against.',
+      );
+      return;
+    }
+
+    const trimmedPaste = pastedText.trim();
+    const hasPastedText = trimmedPaste.length >= 50;
     const hasFile = selectedFile !== null;
+
+    if (trimmedPaste.length > 0 && trimmedPaste.length < 50) {
+      Alert.alert(
+        'Resume Text Too Short',
+        'Please provide at least 50 characters of resume text to receive an accurate evaluation.',
+      );
+      return;
+    }
 
     if (!hasPastedText && !hasFile) {
       Alert.alert(
-        'CV Required',
-        'Please upload a resume file or paste your resume text to continue.',
+        'Resume Required',
+        'Please upload a resume file (PDF, DOCX) or paste your resume text to continue.',
       );
       return;
     }
@@ -194,7 +231,7 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
     setLoadingStep(0);
 
     try {
-      let cvContent = hasPastedText ? pastedText.trim() : undefined;
+      let cvContent = hasPastedText ? trimmedPaste : undefined;
       let pdfBase64: string | undefined;
 
       // Extract binary PDF base64 if a file was selected
@@ -211,7 +248,7 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
         setLoading(false);
         Alert.alert(
           'Resume Unreadable',
-          'Unable to read resume content from the selected file. Please make sure it is a valid PDF document or switch to the "Paste Text" tab.',
+          'Unable to extract text from the selected file. Please make sure it is a valid PDF document or switch to the "Paste Text" tab.',
         );
         return;
       }
@@ -222,6 +259,9 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
         targetRole: targetRole.trim(),
         jobDescription: jobDescription.trim() || undefined,
       });
+
+      // Refresh global quota context so all screens stay in sync
+      await refreshQuota();
 
       // Upload physical document to Supabase Storage if picked
       let uploadedFilePath: string | undefined;
@@ -256,9 +296,17 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
       });
     } catch (error: any) {
       setLoading(false);
+      if (
+        error?.code === 'QUOTA_EXCEEDED' ||
+        error?.message?.includes('free CV scans') ||
+        error?.message?.includes('QUOTA_EXCEEDED')
+      ) {
+        openPaywall('out_of_credits');
+        return;
+      }
       Alert.alert(
-        'Analysis Failed',
-        error?.message || 'Failed to analyze CV. Please check your connection and try again.',
+        'Analysis Incomplete',
+        error?.message || 'Could not complete resume analysis. Please verify your connection and try again.',
       );
     }
   };
@@ -288,13 +336,68 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
                 AI CV BENCHMARK
               </Text>
             </View>
+
+            {/* Quota / Pro Status Pill */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                if (isPro) {
+                  Alert.alert(
+                    'PrepRole Pro Active',
+                    'Your account has unlimited AI resume scans. You can analyze as many resume versions as you need.',
+                    [
+                      {
+                        text: 'Subscription Details',
+                        onPress: () => openPaywall('pro_info'),
+                      },
+                      {text: 'Got It', style: 'default'},
+                    ],
+                  );
+                } else {
+                  openPaywall(
+                    creditsRemaining === 0 ? 'out_of_credits' : 'upgrade',
+                  );
+                }
+              }}
+              style={[
+                styles.headerBadgePill,
+                {
+                  backgroundColor: isPro
+                    ? 'rgba(196, 154, 114, 0.16)'
+                    : colors.bgCard,
+                  borderColor: isPro ? colors.primaryStart : colors.border,
+                },
+              ]}>
+              <Icon
+                name={isPro ? 'diamond' : 'flash'}
+                size={12}
+                color={colors.primaryStart}
+              />
+              <Text
+                style={[
+                  styles.headerBadgeText,
+                  {
+                    color: colors.primaryStart,
+                    marginLeft: 4,
+                    fontWeight: '700',
+                  },
+                ]}>
+                {isPro
+                  ? 'PRO MEMBER'
+                  : creditsRemaining === 0
+                  ? '0 SCANS • UPGRADE'
+                  : creditsRemaining === 1
+                  ? '1 SCAN LEFT'
+                  : `${creditsRemaining} SCANS LEFT`}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <Text style={[styles.headerTitle, {color: colors.textPrimary}]}>
             AI Resume Analyzer
           </Text>
           <Text style={[styles.headerSubtitle, {color: colors.textSecondary}]}>
-            Scan resume content against target roles for instant ATS keyword & score evaluation.
+            Benchmark your resume against target roles for instant ATS keyword matching and scoring.
           </Text>
 
           {/* Stepper bar */}
@@ -804,13 +907,15 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
                 start={{x: 0, y: 0}}
                 end={{x: 1, y: 1}}>
                 <Icon
-                  name="flash"
+                  name={!isPro && creditsRemaining <= 0 ? 'diamond' : 'flash'}
                   size={ICON_SIZES.lg}
                   color="#FFFFFF"
                   style={{marginRight: SPACING.sm}}
                 />
                 <Text style={styles.analyzeButtonText}>
-                  Analyze & Score Resume
+                  {!isPro && creditsRemaining <= 0
+                    ? 'Upgrade to Pro to Analyze'
+                    : 'Analyze & Score Resume'}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -852,6 +957,16 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
         fileSize={selectedFile?.size}
         onClose={() => setShowPdfPreview(false)}
         onReplaceFile={handlePickDocument}
+      />
+
+      {/* Paywall & Subscription Modal */}
+      <PaywallModal
+        visible={showPaywall}
+        currentCredits={creditsRemaining}
+        isPro={isPro}
+        reason={paywallReason}
+        onClose={closePaywall}
+        onSuccess={refreshQuota}
       />
     </View>
   );

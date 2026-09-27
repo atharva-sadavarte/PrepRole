@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -63,6 +64,10 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
     const apiKey = Deno.env.get("GEMINI_API_KEY");
     if (!apiKey) {
       return new Response(
@@ -71,6 +76,59 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // 1. Authenticate user from request header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Authorization header is required." }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabaseUserClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseUserClient.auth.getUser();
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Invalid authentication token. Please sign in again." }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // 2. Server-side Quota Gatekeeping via atomic stored procedure
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
+    const { data: quotaResult, error: quotaError } = await supabaseAdmin.rpc(
+      "deduct_user_scan",
+      { target_user_id: user.id }
+    );
+
+    if (quotaError) {
+      console.error("Quota check RPC error:", quotaError);
+      return new Response(
+        JSON.stringify({ error: "Failed to verify user scan quota." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!quotaResult?.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: "QUOTA_EXCEEDED",
+          message: "You have used all your free CV scans. Upgrade to Pro for unlimited scans!",
+          credits_remaining: 0,
+          plan_type: "free",
+        }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // 3. User is authorized & has quota -> Proceed with CV analysis
     const { cvText, pdfBase64, targetRole, jobDescription } = await req.json();
 
     if (!targetRole || typeof targetRole !== "string") {
@@ -153,7 +211,6 @@ Deno.serve(async (req: Request) => {
     let rawText = candidate?.content?.parts?.[0]?.text;
 
     if (!rawText) {
-      // Look for any part with text
       const textPart = candidate?.content?.parts?.find((p: any) => p.text);
       rawText = textPart?.text;
     }
@@ -165,7 +222,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Strip any unexpected markdown wrap
     const cleanedText = rawText.replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
     const parsed = JSON.parse(cleanedText);
 
@@ -202,6 +258,8 @@ Deno.serve(async (req: Request) => {
         : [],
       skills_matched: Array.isArray(parsed.skills_matched) ? parsed.skills_matched : [],
       skills_missing: Array.isArray(parsed.skills_missing) ? parsed.skills_missing : [],
+      credits_remaining: quotaResult.credits_remaining,
+      plan_type: quotaResult.plan_type,
     };
 
     return new Response(JSON.stringify(result), {

@@ -194,16 +194,32 @@ export async function analyzeCVWithAI({
 
     if (error) {
       console.warn('Supabase Edge Function error:', error);
-      // Fallback: If edge function fails and local key exists, try direct
-      if (GEMINI_API_KEY) {
-        console.warn('Falling back to direct Gemini API call...');
-        return await analyzeWithDirectGemini({
-          cvText,
-          pdfBase64,
-          targetRole,
-          jobDescription,
-        });
+
+      // Check if this is a 403 Quota Exceeded error
+      let isQuotaExceeded = false;
+      try {
+        if (error.context && typeof error.context.json === 'function') {
+          const errBody = await error.context.json();
+          if (errBody?.error === 'QUOTA_EXCEEDED') {
+            isQuotaExceeded = true;
+          }
+        }
+      } catch {
+        // context already consumed or not json
       }
+
+      if (
+        isQuotaExceeded ||
+        error.message?.includes('QUOTA_EXCEEDED') ||
+        error.message?.includes('free CV scans')
+      ) {
+        const quotaErr: any = new Error(
+          "You've used all your free CV scans. Upgrade to Pro for unlimited scans!",
+        );
+        quotaErr.code = 'QUOTA_EXCEEDED';
+        throw quotaErr;
+      }
+
       throw new Error(error.message || 'Failed to analyze CV with AI');
     }
 
@@ -213,18 +229,8 @@ export async function analyzeCVWithAI({
 
     return data as CVAnalysisResult;
   } catch (error: any) {
-    if (GEMINI_API_KEY && !error.message?.includes('direct Gemini')) {
-      try {
-        console.warn('Attempting fallback to direct Gemini API call...');
-        return await analyzeWithDirectGemini({
-          cvText,
-          pdfBase64,
-          targetRole,
-          jobDescription,
-        });
-      } catch (fallbackErr) {
-        console.error('Direct fallback also failed:', fallbackErr);
-      }
+    if (error.code === 'QUOTA_EXCEEDED') {
+      throw error; // Never bypass legitimate quota limits
     }
     console.error('Error analyzing CV:', error);
     throw error;

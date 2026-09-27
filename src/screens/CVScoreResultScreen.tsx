@@ -18,6 +18,8 @@ import {ScoreGauge} from '../components/ScoreGauge';
 import {RecommendationCard} from '../components/RecommendationCard';
 import {openResumeInViewer} from '../services/resumeService';
 import {ResumeAnalysisRecord, PriorityLevel} from '../types/resume';
+import {useQuota} from '../context/QuotaContext';
+import PaywallModal from '../components/PaywallModal';
 import Icon from '../components/Icon';
 
 interface CVScoreResultScreenProps {
@@ -35,6 +37,15 @@ export const CVScoreResultScreen: React.FC<CVScoreResultScreenProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const {colors, isDark} = useTheme();
+  const {
+    isPro,
+    creditsRemaining,
+    refreshQuota,
+    showPaywall,
+    paywallReason,
+    openPaywall,
+    closePaywall,
+  } = useQuota();
   const {analysis} = route.params;
   const [activeTab, setActiveTab] = useState<'recommendations' | 'skills' | 'strengths'>(
     'recommendations',
@@ -52,7 +63,7 @@ export const CVScoreResultScreen: React.FC<CVScoreResultScreenProps> = ({
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `My CV scored ${analysis.overall_score}/100 for the role of ${analysis.target_role} on PrepRole!`,
+        message: `My resume scored ${analysis.overall_score}/100 for the role of "${analysis.target_role}" on PrepRole! Benchmark your CV against ATS standards.`,
       });
     } catch (e) {
       console.error(e);
@@ -71,9 +82,9 @@ export const CVScoreResultScreen: React.FC<CVScoreResultScreenProps> = ({
   const getPriorityIcon = (p: string) => {
     switch (p) {
       case 'high':
-        return {color: '#C25953', label: 'Critical'};
+        return {color: '#C25953', label: 'Critical Fixes'};
       case 'medium':
-        return {color: '#D9822B', label: 'Medium'};
+        return {color: '#D9822B', label: 'Recommended'};
       case 'low':
         return {color: '#5B8266', label: 'Polish'};
       default:
@@ -116,7 +127,7 @@ export const CVScoreResultScreen: React.FC<CVScoreResultScreenProps> = ({
           </TouchableOpacity>
 
           <Text style={[styles.headerTitle, {color: colors.textPrimary}]}>
-            CV Score Report
+            CV Analysis Report
           </Text>
 
           <TouchableOpacity

@@ -55,10 +55,14 @@ App.tsx (session + onboarding state, ThemeProvider, SafeAreaProvider)
 | `src/config/env.local.ts` | **GITIGNORED** — local API key (create manually) |
 | `src/types/resume.ts` | All shared TS types: `CVAnalysisResult`, `ResumeAnalysisRecord`, `ScoreTier`, etc. |
 | `src/services/aiService.ts` | Invokes Supabase Edge Function `analyze-cv` (with local direct fallback) |
+| `src/services/quotaService.ts` | Fetches and manages user scan balance from `user_quotas` |
 | `src/services/resumeService.ts` | Supabase CRUD for `resume_analyses` + Storage upload/signed URLs |
 | `src/services/pdfService.ts` | Native PDF rendering + base64 extraction (Android `PdfPreviewModule`) |
-| `supabase/functions/analyze-cv/index.ts` | Serverless Edge Function executing Gemini AI analysis with Supabase Secrets |
-| `supabase/migrations/20260905_create_resume_analyses.sql` | Full DB schema + RLS policies + storage bucket |
+| `src/components/PaywallModal.tsx` | High-converting subscription & credit top-up paywall modal |
+| `supabase/functions/analyze-cv/index.ts` | Serverless Edge Function: quota gatekeeping + Gemini AI execution |
+| `supabase/functions/revenuecat-webhook/index.ts` | Webhook endpoint updating user quotas on Google Play purchase events |
+| `supabase/migrations/20260905_create_resume_analyses.sql` | Resume analyses schema + RLS policies + storage bucket |
+| `supabase/migrations/20260913_create_user_quotas.sql` | User quotas table, signup trigger (3 credits), and atomic deduction RPC |
 
 ---
 
@@ -92,9 +96,11 @@ showSplash → SplashScreen
 
 - **URL:** `https://drjlrhrvpyhpkzuewrmy.supabase.co` (hardcoded in `src/lib/supabase.ts`)
 - **Anon key:** Also hardcoded (public-safe anon key, RLS enforced)
-- **Table:** `public.resume_analyses`
-  - Key columns: `id`, `user_id`, `target_role`, `job_description`, `file_name`, `file_url`, `overall_score`, `score_tier`, `breakdown` (JSONB), `summary`, `strengths` (JSONB), `improvements` (JSONB), `skills_matched` (JSONB), `skills_missing` (JSONB), `created_at`
-- **RLS:** All 4 CRUD policies scoped to `auth.uid() = user_id`
+- **Tables:**
+  - `public.resume_analyses`: Full CV analysis records, strengths, improvements, matched/missing skills
+  - `public.user_quotas`: User scan credits, plan type (`free` \| `pro`), pro expiration timestamp
+- **RLS:** All tables enforce `auth.uid() = user_id`. No client direct writes allowed to `user_quotas`.
+- **Atomic RPC:** `deduct_user_scan(target_user_id)` atomically checks and deducts scan credits inside Postgres.
 - **Storage bucket:** `resumes` (private) — path format: `{userId}/{timestamp}_{cleanFileName}`
 - **Signed URLs:** 1-hour expiry for resume previews
 
@@ -149,9 +155,21 @@ showSplash → SplashScreen
 | Component | Description |
 |-----------|-------------|
 | `src/components/Icon.tsx` | Wrapper around Ionicons from react-native-vector-icons |
+| `src/components/PaywallModal.tsx` | Native Google Play subscription and credit booster paywall modal |
 | `src/components/PdfPreviewModal.tsx` | In-app PDF preview modal |
 | `src/components/RecommendationCard.tsx` | CV improvement item card |
 | `src/components/ScoreGauge.tsx` | Circular score display |
+
+---
+
+## User Quotas & Monetization (Paywall)
+
+- **Free Tier:** New signups automatically receive **3 free CV scans** via database trigger (`handle_new_user_quota`).
+- **Server Enforcement:** The `analyze-cv` Edge Function validates user JWT and executes `deduct_user_scan` **before** invoking Gemini.
+- **Zero-Trust Client:** Clients cannot grant themselves Pro or add credits. Quotas are strictly managed server-side.
+- **Quota Exceeded:** Returns HTTP `403` with `error: "QUOTA_EXCEEDED"`. Mobile app catches this to automatically open `PaywallModal`.
+- **Pro Tier:** Unlimited scans (`plan_type = 'pro'`).
+- **RevenueCat Webhooks:** Endpoint `revenuecat-webhook` handles Google Play purchase/renewal/expiration events and syncs with `user_quotas`.
 
 ---
 
