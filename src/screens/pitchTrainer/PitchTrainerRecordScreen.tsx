@@ -1,4 +1,4 @@
-import React, {useState, useRef, useEffect} from 'react';
+import React, {useState, useRef, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
   Modal,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTheme} from '../../context/ThemeContext';
@@ -65,6 +66,10 @@ export const PitchTrainerRecordScreen: React.FC<PitchTrainerRecordScreenProps> =
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [transcript, setTranscript] = useState('');
   const [activeToast, setActiveToast] = useState<string | null>(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+
+  // Ref to track latest secondsElapsed for use in timer callbacks (avoids stale closures)
+  const secondsElapsedRef = useRef(0);
 
   // Teleprompter / notes drawer
   const [showNotesDrawer, setShowNotesDrawer] = useState(true);
@@ -159,13 +164,16 @@ export const PitchTrainerRecordScreen: React.FC<PitchTrainerRecordScreenProps> =
 
     setIsRecording(true);
     setSecondsElapsed(0);
+    secondsElapsedRef.current = 0;
     setRecordedUri(null);
     setTranscript('');
     setActiveToast(null);
+    setIsTranscribing(false);
 
     timerRef.current = setInterval(() => {
       setSecondsElapsed(sec => {
         const next = sec + 1;
+        secondsElapsedRef.current = next;
         // Prompts at 10s, 105s, 165s (Rule PT-15)
         if (next === 10) {
           setActiveToast('Clear opening! Project with energy.');
@@ -174,7 +182,7 @@ export const PitchTrainerRecordScreen: React.FC<PitchTrainerRecordScreenProps> =
         } else if (next === 165) {
           setActiveToast('Final 15 seconds. Bring your strong conclusion.');
         } else if (next >= MAX_PITCH_DURATION_SECONDS) {
-          handleStopRecording();
+          handleStopRecordingFromTimer();
         }
         return next;
       });
@@ -182,8 +190,11 @@ export const PitchTrainerRecordScreen: React.FC<PitchTrainerRecordScreenProps> =
   };
 
   // Stop recording (Rule PT-15: stop disabled before 15s)
-  const handleStopRecording = async () => {
-    if (secondsElapsed < MIN_PITCH_DURATION_SECONDS) {
+  // Uses the provided elapsed time or falls back to the ref to avoid stale closure issues
+  const handleStopRecordingInternal = useCallback(async (elapsedOverride?: number) => {
+    const elapsed = elapsedOverride ?? secondsElapsedRef.current;
+
+    if (elapsed < MIN_PITCH_DURATION_SECONDS) {
       Alert.alert(
         'Recording Too Short',
         `Pitches must be at least ${MIN_PITCH_DURATION_SECONDS} seconds long. Keep speaking!`,
@@ -194,9 +205,9 @@ export const PitchTrainerRecordScreen: React.FC<PitchTrainerRecordScreenProps> =
     if (timerRef.current) clearInterval(timerRef.current);
     setIsRecording(false);
     setActiveToast(null);
+    setIsTranscribing(true);
 
-    const result = await stopNativeAudioRecording(secondsElapsed);
-    setRecordedUri(result.uri);
+    const result = await stopNativeAudioRecording(elapsed);
 
     let b64 = result.base64;
     if (!b64 && result.uri) {
@@ -208,6 +219,9 @@ export const PitchTrainerRecordScreen: React.FC<PitchTrainerRecordScreenProps> =
         const transcribed = await transcribeUserAudioWithGemini(b64, language || 'en-US');
         if (transcribed && transcribed.trim().length > 0) {
           setTranscript(transcribed.trim());
+          // Set recordedUri AFTER transcript is ready so the Analyse button is safe to tap
+          setRecordedUri(result.uri);
+          setIsTranscribing(false);
           return;
         }
       } catch (err) {
@@ -215,8 +229,18 @@ export const PitchTrainerRecordScreen: React.FC<PitchTrainerRecordScreenProps> =
       }
     }
 
-    generateTranscriptFromTake(secondsElapsed);
-  };
+    // Fallback: generate transcript from notes
+    generateTranscriptFromTake(elapsed);
+    // Set recordedUri AFTER transcript is ready
+    setRecordedUri(result.uri);
+    setIsTranscribing(false);
+  }, [language, notes]);
+
+  // Called from the stop button — uses current state value
+  const handleStopRecording = () => handleStopRecordingInternal(secondsElapsed);
+
+  // Called from the timer callback — uses ref to avoid stale closure
+  const handleStopRecordingFromTimer = () => handleStopRecordingInternal();
 
   const generateTranscriptFromTake = (duration: number) => {
     // Generate realistic, rich transcript combining user's structured notes
@@ -471,7 +495,7 @@ export const PitchTrainerRecordScreen: React.FC<PitchTrainerRecordScreenProps> =
           </View>
 
           {/* Primary Record Button / Analyze Button */}
-          {!recordedUri ? (
+          {!recordedUri && !isTranscribing ? (
             <View style={styles.recordButtonWrap}>
               <Animated.View
                 style={[
@@ -506,11 +530,21 @@ export const PitchTrainerRecordScreen: React.FC<PitchTrainerRecordScreenProps> =
           ) : (
             <View style={styles.analyzeBtnWrap}>
               <TouchableOpacity
-                style={[styles.analyzeSubmitBtn, {backgroundColor: colors.primaryStart}]}
+                style={[
+                  styles.analyzeSubmitBtn,
+                  {backgroundColor: isTranscribing ? '#6B7280' : colors.primaryStart},
+                ]}
                 onPress={handleAnalyzePitch}
+                disabled={isTranscribing}
                 activeOpacity={0.85}>
-                <Icon name="sparkles" size={18} color="#FFFFFF" />
-                <Text style={styles.analyzeSubmitText}>Analyse My Pitch</Text>
+                {isTranscribing ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Icon name="sparkles" size={18} color="#FFFFFF" />
+                )}
+                <Text style={styles.analyzeSubmitText}>
+                  {isTranscribing ? 'Processing Audio...' : 'Analyse My Pitch'}
+                </Text>
               </TouchableOpacity>
             </View>
           )}

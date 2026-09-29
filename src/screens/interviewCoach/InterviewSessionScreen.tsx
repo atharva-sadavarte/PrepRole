@@ -31,6 +31,7 @@ import {
   gradeInterviewAttempt,
   setAutoResumeSuppressed,
   transcribeUserAudioWithGemini,
+  isValidSpokenSpeech,
 } from '../../services/interviewCoachService';
 import {
   requestAudioPermission,
@@ -95,8 +96,12 @@ export const InterviewSessionScreen: React.FC<InterviewSessionScreenProps> = ({
   // First-time drop-off survey modal
   const [showDropOffModal, setShowDropOffModal] = useState(false);
 
-  // Timer Ref
+  // Audio Not Detected modal (Exact Personal Pitch Trainer Rule PT-18)
+  const [showAudioNotDetectedModal, setShowAudioNotDetectedModal] = useState(false);
+
+  // Timer Ref & seconds tracking
   const timerRef = useRef<any>(null);
+  const recordingSecondsRef = useRef(0);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -256,11 +261,13 @@ export const InterviewSessionScreen: React.FC<InterviewSessionScreenProps> = ({
 
     setIsRecording(true);
     setRecordingSeconds(0);
+    recordingSecondsRef.current = 0;
     setAudioPromptToast(null);
 
     timerRef.current = setInterval(() => {
       setRecordingSeconds(sec => {
         const next = sec + 1;
+        recordingSecondsRef.current = next;
         // Prompts at 30s and 105s (Rule IC-25)
         if (next === 30) {
           setAudioPromptToast('Keep going! Elaborate with concrete examples.');
@@ -268,7 +275,7 @@ export const InterviewSessionScreen: React.FC<InterviewSessionScreenProps> = ({
           setAudioPromptToast('Almost done! Wrap up your conclusion.');
         } else if (next >= 120) {
           // Auto-stop at 120s
-          handleStopRecording();
+          handleStopRecordingInternal();
         }
         return next;
       });
@@ -276,12 +283,13 @@ export const InterviewSessionScreen: React.FC<InterviewSessionScreenProps> = ({
   };
 
   // Stop recording & open transcript review (Rule IC-26, IC-27)
-  const handleStopRecording = async () => {
+  const handleStopRecordingInternal = async (elapsedOverride?: number) => {
+    const elapsed = elapsedOverride ?? recordingSecondsRef.current;
     if (timerRef.current) clearInterval(timerRef.current);
     setIsRecording(false);
     setAudioPromptToast(null);
 
-    const result = await stopNativeAudioRecording(recordingSeconds);
+    const result = await stopNativeAudioRecording(elapsed);
     setRecordedUri(result.uri);
 
     setIsTranscribing(true);
@@ -297,28 +305,45 @@ export const InterviewSessionScreen: React.FC<InterviewSessionScreenProps> = ({
     try {
       if (b64 && b64.length > 50) {
         const transcribed = await transcribeUserAudioWithGemini(b64, journey?.language || 'en-US');
-        if (transcribed && transcribed.trim().length > 0) {
+        if (transcribed && isValidSpokenSpeech(transcribed)) {
           setTranscriptText(transcribed.trim());
         } else {
           setTranscriptText('');
-          Alert.alert(
-            'Speech Not Detected',
-            'We could not detect clear words in the recording. You can type or review your response below, or tap Re-record.',
-          );
+          setShowTranscriptModal(false);
+          setShowAudioNotDetectedModal(true);
         }
       } else {
         setTranscriptText('');
+        setShowTranscriptModal(false);
+        setShowAudioNotDetectedModal(true);
       }
     } catch (e: any) {
       console.warn('Speech transcription error:', e);
       setTranscriptText('');
-      Alert.alert(
-        'Transcription Service Busy',
-        'Could not reach the AI speech service. Your audio was saved—you can type or review your response below, or tap Retry Transcribe.',
-      );
+      setShowTranscriptModal(false);
+      setShowAudioNotDetectedModal(true);
     } finally {
       setIsTranscribing(false);
     }
+  };
+
+  // Called from manual stop button
+  const handleStopRecording = () => handleStopRecordingInternal(recordingSeconds);
+
+  // Reset/Restart take (Exact Personal Pitch Trainer Rule PT-16 / PT-18)
+  const handleConfirmRestart = async () => {
+    setShowAudioNotDetectedModal(false);
+    setShowTranscriptModal(false);
+    if (timerRef.current) clearInterval(timerRef.current);
+    setIsRecording(false);
+    setRecordingSeconds(0);
+    recordingSecondsRef.current = 0;
+    setRecordedUri(null);
+    setRecordedBase64(null);
+    setTranscriptText('');
+    setAudioPromptToast(null);
+    setIsTranscribing(false);
+    await cancelNativeAudioRecording();
   };
 
   const handleRetryTranscription = async () => {
@@ -326,19 +351,15 @@ export const InterviewSessionScreen: React.FC<InterviewSessionScreenProps> = ({
     setIsTranscribing(true);
     try {
       const transcribed = await transcribeUserAudioWithGemini(recordedBase64, journey?.language || 'en-US');
-      if (transcribed && transcribed.trim().length > 0) {
+      if (transcribed && isValidSpokenSpeech(transcribed)) {
         setTranscriptText(transcribed.trim());
       } else {
-        Alert.alert(
-          'Speech Not Detected',
-          'Could not detect spoken words in the recording. You can type your response below or tap Re-record.',
-        );
+        setShowTranscriptModal(false);
+        setShowAudioNotDetectedModal(true);
       }
     } catch (e) {
-      Alert.alert(
-        'Transcription Service Busy',
-        'Could not reach the AI speech service. You can type or edit your response directly.',
-      );
+      setShowTranscriptModal(false);
+      setShowAudioNotDetectedModal(true);
     } finally {
       setIsTranscribing(false);
     }
@@ -347,8 +368,9 @@ export const InterviewSessionScreen: React.FC<InterviewSessionScreenProps> = ({
   // Submit Answer Attempt (Rule IC-27, IC-30, IC-31)
   const handleSubmitAttempt = async () => {
     if (!selectedRound || !journey) return;
-    if (!transcriptText.trim()) {
-      Alert.alert('Response Empty', 'Please provide or edit your answer transcript before submitting.');
+    if (!transcriptText.trim() || !isValidSpokenSpeech(transcriptText.trim())) {
+      setShowTranscriptModal(false);
+      setShowAudioNotDetectedModal(true);
       return;
     }
 
@@ -873,10 +895,7 @@ export const InterviewSessionScreen: React.FC<InterviewSessionScreenProps> = ({
             <View style={styles.modalActionsRow}>
               <TouchableOpacity
                 style={[styles.reRecordBtn, {borderColor: colors.border}]}
-                onPress={() => {
-                  setShowTranscriptModal(false);
-                  setRecordingSeconds(0);
-                }}>
+                onPress={handleConfirmRestart}>
                 <Text style={[styles.reRecordText, {color: colors.textSecondary}]}>
                   Re-record
                 </Text>
@@ -910,6 +929,31 @@ export const InterviewSessionScreen: React.FC<InterviewSessionScreenProps> = ({
                 )}
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Audio Not Detected Modal (Exact Personal Pitch Trainer Rule PT-18) */}
+      <Modal visible={showAudioNotDetectedModal} transparent animationType="fade">
+        <View style={styles.promptModalOverlay}>
+          <View
+            style={[
+              styles.promptModal,
+              {backgroundColor: colors.bgCard, borderColor: colors.border},
+            ]}>
+            <Icon name="mic-off-outline" size={36} color="#EF4444" />
+            <Text style={[styles.promptModalTitle, {color: colors.textPrimary}]}>
+              Audio Not Detected
+            </Text>
+            <Text style={[styles.promptModalBody, {color: colors.textSecondary}]}>
+              No clear speech was recognized in your recording. Please ensure your microphone is unobstructed, speak clearly, and record your response again.
+            </Text>
+            <TouchableOpacity
+              style={[styles.modalPrimaryBtn, {backgroundColor: colors.primaryStart, width: '100%'}]}
+              onPress={handleConfirmRestart}
+              activeOpacity={0.85}>
+              <Text style={styles.modalPrimaryBtnText}>Record Again</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1196,6 +1240,43 @@ const styles = StyleSheet.create({
   surveyPrimaryText: {color: '#FFFFFF', fontSize: 14, fontFamily: FONTS.semiBold},
   surveySecondaryBtn: {alignItems: 'center', paddingVertical: 8},
   surveySecondaryText: {fontSize: 13, fontFamily: FONTS.regular},
+  promptModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+  },
+  promptModal: {
+    width: '100%',
+    padding: SPACING.xl,
+    borderRadius: RADIUS.xl,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  promptModalTitle: {
+    fontSize: 17,
+    fontFamily: FONTS.bold,
+    marginTop: SPACING.sm,
+    textAlign: 'center',
+  },
+  promptModalBody: {
+    fontSize: 13,
+    fontFamily: FONTS.regular,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginVertical: SPACING.md,
+  },
+  modalPrimaryBtn: {
+    paddingVertical: 12,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+  },
+  modalPrimaryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: FONTS.semiBold,
+  },
 });
 
 export default InterviewSessionScreen;

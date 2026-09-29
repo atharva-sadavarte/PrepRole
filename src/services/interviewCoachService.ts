@@ -118,6 +118,12 @@ STRICT JSON OUTPUT FORMAT ONLY:
   }
 }
 
+import {
+  getFallback10RoundQuestions,
+  sanitize10RoundQuestions,
+} from '../utils/interviewQuestions';
+export {getFallback10RoundQuestions, sanitize10RoundQuestions};
+
 /**
  * Generate 10-round questions skeleton for confirmed job role
  */
@@ -127,27 +133,37 @@ export async function generate10RoundQuestions(
   learnerCountry: string = 'India',
 ): Promise<JourneyRound[]> {
   const prompt = `
-Generate 10 structured interview questions for the job role: "${jobRole}".
+You are an expert technical interviewer and executive talent recruiter.
+Generate exactly 10 structured, realistic interview questions for a candidate targeting the role: "${jobRole}".
 Country: ${learnerCountry}
 Language: ${language}
 
-Follow this exact progressive difficulty structure:
-Round 1 (Warm-up): Opening elevator pitch / motivation for ${jobRole}.
-Rounds 2-4 (Easy): Foundational core questions and basic scenarios.
-Rounds 5-8 (Medium): In-depth problem solving, architecture/system design or trade-offs, behavioral conflict.
-Rounds 9-10 (Hard): Complex crisis management, deep domain stress-test, and R10 being the definitive "Real Interview" final trial.
+STRICT PROGRESSIVE DIFFICULTY CRITERIA:
+- Round 1 [Warm-up]: MUST be the classic "Tell me about yourself" introductory question tailored specifically to the ${jobRole} role (e.g., "Tell me about yourself, your background, and why you are interested in this position as a ${jobRole}.").
+- Rounds 2-4 [Easy]: Foundational core knowledge & standard workflows:
+  * Round 2 (Easy): Core technical tools, foundational principles, and daily frameworks for ${jobRole}.
+  * Round 3 (Easy): Standard development/implementation workflow from user story to shipping features.
+  * Round 4 (Easy): Team collaboration, constructive code reviews, and daily task prioritization.
+- Rounds 5-8 [Medium]: Realistic problem solving, architecture & conflict resolution:
+  * Round 5 (Medium): Debugging a complex technical bug, memory leak, or performance bottleneck in ${jobRole}.
+  * Round 6 (Medium): Evaluating architectural trade-offs between competing solutions or libraries.
+  * Round 7 (Medium): Handling unexpected scope changes or shifting deadlines near a major launch.
+  * Round 8 (Medium): Resolving a technical disagreement with a peer, designer, or product manager.
+- Rounds 9-10 [Hard]: High-stakes crisis management and definitive trial:
+  * Round 9 (Hard): Production incident or system outage triage, root-cause isolation, and preventative safeguards.
+  * Round 10 (Hard - Real Interview): The ultimate final interview challenge—designing a high-scale, resilient system architecture from scratch under real-world constraints.
 
-STRICT JSON OUTPUT:
+STRICT JSON OUTPUT FORMAT:
 {
   "questions": [
     {
       "roundNumber": 1,
       "level": "warmup",
-      "question": "string",
-      "contextHint": "string",
-      "sampleAnswer": "string"
+      "question": "Tell me about yourself, your background, and why you are interested in this position as a ${jobRole}.",
+      "contextHint": "Coaching tip explaining what recruiters listen for and how to structure the response (Present-Past-Future or STAR).",
+      "sampleAnswer": "A 4-5 star exemplary answer demonstrating structure and depth."
     },
-    ... (10 items total, roundNumber 1 to 10)
+    ... (exactly 10 items, roundNumber 1 to 10)
   ]
 }
 `;
@@ -163,64 +179,21 @@ STRICT JSON OUTPUT:
 
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (rawText) {
-        const parsed = JSON.parse(rawText.trim());
-        if (Array.isArray(parsed.questions) && parsed.questions.length === 10) {
-          return parsed.questions.map((q: any, index: number) => {
-            const skeleton = ROUND_SKELETON_CONFIG[index];
-            return {
-              roundNumber: skeleton.roundNumber,
-              level: skeleton.level,
-              levelLabel: skeleton.levelLabel,
-              question: q.question,
-              contextHint: q.contextHint || 'Focus on concrete examples and structured delivery.',
-              sampleAnswer: q.sampleAnswer || '',
-              status: index === 0 ? 'inProgress' : 'locked',
-              score: undefined,
-              attemptsCount: 0,
-            };
-          });
-        }
+      const parsed = JSON.parse(rawText.trim());
+      if (Array.isArray(parsed.questions) && parsed.questions.length === 10) {
+        return sanitize10RoundQuestions(parsed.questions, jobRole);
       }
+    }
   } catch (err) {
     console.warn('generate10RoundQuestions AI call failed, using fallback:', err);
   }
 
-  // Fallback 10-round questions generator
-  return ROUND_SKELETON_CONFIG.map((skeleton, index) => {
-    let question = '';
-    let contextHint = '';
-    let sampleAnswer = '';
-
-    if (skeleton.roundNumber === 1) {
-      question = `Tell me about yourself and what motivates you to pursue this role as a ${jobRole}?`;
-      contextHint = 'Structure your answer using Present, Past, and Future. Keep it under 90 seconds.';
-      sampleAnswer = `I am a dedicated professional with deep passion for ${jobRole}. Over the past years, I have built impactful solutions, collaborated across disciplines, and I am excited to bring my problem-solving ability to this role.`;
-    } else if (skeleton.roundNumber <= 4) {
-      question = `What core principles and tools do you rely on most when executing key responsibilities in ${jobRole}?`;
-      contextHint = 'Mention 2-3 specific technical or domain frameworks you use daily.';
-      sampleAnswer = `In my day-to-day work as a ${jobRole}, I rely on systematic planning, robust test-driven execution, and clear stakeholder communication to deliver maintainable results.`;
-    } else if (skeleton.roundNumber <= 8) {
-      question = `Describe a situation where a project or requirement shifted unexpectedly. How did you adapt your approach?`;
-      contextHint = 'Use the STAR method (Situation, Task, Action, Result). Highlight your resilience and agility.';
-      sampleAnswer = `When requirements changed midway, I immediately re-evaluated priorities with the team, broke the new deliverables into phased sprints, and ensured we launched on schedule with zero regressions.`;
-    } else {
-      question = `Imagine you are faced with a critical production breakdown or high-stakes deadline for ${jobRole}. Walk me through your decision matrix from triage to post-mortem.`;
-      contextHint = 'Demonstrate executive composure, root-cause analysis, and cross-functional leadership.';
-      sampleAnswer = `My first priority is containment and impact assessment. Once stabilized, I lead the root-cause diagnosis, coordinate fixes with transparent communication, and document permanent preventative safeguards.`;
-    }
-
-    return {
-      roundNumber: skeleton.roundNumber,
-      level: skeleton.level,
-      levelLabel: skeleton.levelLabel,
-      question,
-      contextHint,
-      sampleAnswer,
-      status: index === 0 ? 'inProgress' : 'locked',
-      attemptsCount: 0,
-    };
-  });
+  // Fallback 10-round questions generator with unique, progressive questions
+  return getFallback10RoundQuestions(jobRole);
 }
+
+import {isValidSpokenSpeech, cleanSpokenTranscript} from '../utils/speechUtils';
+export {isValidSpokenSpeech, cleanSpokenTranscript};
 
 /**
  * Transcribes user speech recording using Gemini 3.6 Flash multimodal audio
@@ -269,13 +242,8 @@ Rules:
         rawText += part.text + ' ';
       }
     }
-    rawText = rawText.trim();
 
-    if (rawText === '[NO_SPEECH]') {
-      return '';
-    }
-
-    return rawText.replace(/^["']|["']$/g, '').trim();
+    return cleanSpokenTranscript(rawText);
   } catch (err) {
     console.warn('transcribeUserAudioWithGemini error:', err);
     throw err;
