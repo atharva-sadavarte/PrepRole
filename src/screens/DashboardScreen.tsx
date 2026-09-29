@@ -123,9 +123,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
         .getParent()
         ?.navigate('HistoryTab', {screen: 'ScoreHistoryMain'});
     } else if (key === 'interview') {
-      navigation
-        .getParent()
-        ?.navigate('AnalyzeTab', {screen: 'CVUploadMain'});
+      navigation.navigate('InterviewSetup');
     } else {
       navigation
         .getParent()
@@ -714,14 +712,14 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                       styles.compactCardTitle,
                       {color: colors.textPrimary},
                     ]}>
-                    Mock Interview
+                    Interview Coach
                   </Text>
                   <Text
                     style={[
                       styles.compactCardDesc,
                       {color: colors.textSecondary},
                     ]}>
-                    Practice AI drills
+                    60-90s Intro Drill
                   </Text>
                 </TouchableOpacity>
               </Animated.View>

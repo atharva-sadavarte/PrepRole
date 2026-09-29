@@ -13,17 +13,35 @@ import CVUploadScreen from '../screens/CVUploadScreen';
 import CVScoreResultScreen from '../screens/CVScoreResultScreen';
 import ScoreHistoryScreen from '../screens/ScoreHistoryScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import InterviewSetupScreen from '../screens/InterviewSetupScreen';
+import InterviewRecordingScreen from '../screens/InterviewRecordingScreen';
+import InterviewResultScreen from '../screens/InterviewResultScreen';
 import {ResumeAnalysisRecord} from '../types/resume';
+import {ExperienceLevel, InterviewMode, InterviewSessionRecord} from '../types/interview';
 
 // --- Stack Param Lists ---
 export type HomeStackParamList = {
   DashboardMain: undefined;
   CVScoreResult: {analysis: ResumeAnalysisRecord};
+  InterviewSetup: undefined;
+  InterviewRecording: {
+    experienceLevel: ExperienceLevel;
+    recordingMode: InterviewMode;
+    targetRole: string;
+  };
+  InterviewResult: {analysis: InterviewSessionRecord};
 };
 
 export type AnalyzeStackParamList = {
   CVUploadMain: undefined;
   CVScoreResult: {analysis: ResumeAnalysisRecord};
+  InterviewSetup: undefined;
+  InterviewRecording: {
+    experienceLevel: ExperienceLevel;
+    recordingMode: InterviewMode;
+    targetRole: string;
+  };
+  InterviewResult: {analysis: InterviewSessionRecord};
 };
 
 export type HistoryStackParamList = {
@@ -69,6 +87,11 @@ const ProfileScreenWrapper = (props: any) => {
   return <ProfileScreen {...props} session={session!} />;
 };
 
+const InterviewRecordingScreenWrapper = (props: any) => {
+  const session = useSession();
+  return <InterviewRecordingScreen {...props} session={session!} />;
+};
+
 // --- Tab Stack Screens as stable component definitions ---
 const HomeTabScreen = () => {
   const {colors} = useTheme();
@@ -81,6 +104,9 @@ const HomeTabScreen = () => {
       }}>
       <HomeStack.Screen name="DashboardMain" component={DashboardScreenWrapper} />
       <HomeStack.Screen name="CVScoreResult" component={CVScoreResultScreen} />
+      <HomeStack.Screen name="InterviewSetup" component={InterviewSetupScreen} />
+      <HomeStack.Screen name="InterviewRecording" component={InterviewRecordingScreenWrapper} />
+      <HomeStack.Screen name="InterviewResult" component={InterviewResultScreen} />
     </HomeStack.Navigator>
   );
 };
@@ -96,6 +122,9 @@ const AnalyzeTabScreen = () => {
       }}>
       <AnalyzeStack.Screen name="CVUploadMain" component={CVUploadScreenWrapper} />
       <AnalyzeStack.Screen name="CVScoreResult" component={CVScoreResultScreen} />
+      <AnalyzeStack.Screen name="InterviewSetup" component={InterviewSetupScreen} />
+      <AnalyzeStack.Screen name="InterviewRecording" component={InterviewRecordingScreenWrapper} />
+      <AnalyzeStack.Screen name="InterviewResult" component={InterviewResultScreen} />
     </AnalyzeStack.Navigator>
   );
 };
