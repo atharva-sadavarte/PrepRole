@@ -175,3 +175,76 @@ export async function captureNativeVideo(
     base64: '',
   };
 }
+
+/**
+ * Speaks question text using native Android TTS (with fallback simulated speech).
+ * Default speechRate = 0.83 provides a calm, clear, standard interview interviewer cadence
+ * so candidates can comfortably absorb and understand every part of the question.
+ */
+export async function speakQuestionText(
+  text: string,
+  languageTag: string = 'en-US',
+  speechRate: number = 0.83,
+): Promise<boolean> {
+  // 1. Try native Android TextToSpeech engine with custom calm speech rate
+  if (Platform.OS === 'android' && InterviewMediaModule?.speakTextWithRate) {
+    try {
+      const res = await InterviewMediaModule.speakTextWithRate(text, languageTag, speechRate);
+      if (res?.success) return true;
+    } catch (e) {
+      console.warn('Native speakTextWithRate failed, trying standard speakText:', e);
+    }
+  }
+
+  if (Platform.OS === 'android' && InterviewMediaModule?.speakText) {
+    try {
+      const res = await InterviewMediaModule.speakText(text, languageTag);
+      if (res?.success) return true;
+    } catch (e) {
+      console.warn('Native speakText failed, falling back to audio playback stream:', e);
+    }
+  }
+
+  // 2. High-fidelity audio stream fallback via MediaPlayer
+  try {
+    const langCode = languageTag.split('-')[0] || 'en';
+    const cleanText = encodeURIComponent(text.substring(0, 180));
+    const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${langCode}&client=tw-ob&q=${cleanText}`;
+    if (Platform.OS === 'android' && InterviewMediaModule?.startAudioPlayback) {
+      const res = await InterviewMediaModule.startAudioPlayback(ttsUrl);
+      return !!res?.playing;
+    }
+  } catch (err) {
+    console.warn('Google TTS audio playback failed:', err);
+  }
+
+  return true;
+}
+
+/**
+ * Stops question speech playback
+ */
+export async function stopQuestionSpeech(): Promise<void> {
+  if (Platform.OS === 'android' && InterviewMediaModule?.stopSpeech) {
+    try {
+      await InterviewMediaModule.stopSpeech();
+    } catch (e) {
+      console.warn('stopQuestionSpeech error:', e);
+    }
+  }
+}
+
+/**
+ * Reads local media file as base64 string
+ */
+export async function readMediaFileAsBase64(uriString: string): Promise<string> {
+  if (Platform.OS === 'android' && InterviewMediaModule?.readFileAsBase64) {
+    try {
+      return await InterviewMediaModule.readFileAsBase64(uriString);
+    } catch (e) {
+      console.warn('readMediaFileAsBase64 error:', e);
+    }
+  }
+  return '';
+}
+

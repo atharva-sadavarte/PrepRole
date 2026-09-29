@@ -18,6 +18,20 @@ import InterviewRecordingScreen from '../screens/InterviewRecordingScreen';
 import InterviewResultScreen from '../screens/InterviewResultScreen';
 import {ResumeAnalysisRecord} from '../types/resume';
 import {ExperienceLevel, InterviewMode, InterviewSessionRecord} from '../types/interview';
+import {InterviewAttempt} from '../types/interviewCoach';
+import {PitchNotes, PersonalPitch} from '../types/pitchTrainer';
+
+// New Interview Coach screens
+import InterviewCoachScreenV2 from '../screens/interviewCoach/InterviewCoachScreenV2';
+import InterviewSessionScreen from '../screens/interviewCoach/InterviewSessionScreen';
+import InterviewFeedbackScreen from '../screens/interviewCoach/InterviewFeedbackScreen';
+import InterviewCoachResultScreen from '../screens/interviewCoach/InterviewResultScreen';
+
+// New Personal Pitch Trainer screens
+import PersonalPitchTrainerScreen from '../screens/pitchTrainer/PersonalPitchTrainerScreen';
+import PitchTrainerCreateScreen from '../screens/pitchTrainer/PitchTrainerCreateScreen';
+import PitchTrainerRecordScreen from '../screens/pitchTrainer/PitchTrainerRecordScreen';
+import PitchTrainerFeedbackScreen from '../screens/pitchTrainer/PitchTrainerFeedbackScreen';
 
 // --- Stack Param Lists ---
 export type HomeStackParamList = {
@@ -30,6 +44,32 @@ export type HomeStackParamList = {
     targetRole: string;
   };
   InterviewResult: {analysis: InterviewSessionRecord};
+  // Interview Coach routes
+  InterviewCoach: {resumeOngoingFromMenu?: boolean} | undefined;
+  InterviewSession: {journeyId: string; jobRole: string; isFirstTimeJobRole?: boolean};
+  InterviewFeedback: {journeyId: string; roundNumber: number; attempt: InterviewAttempt; jobRole: string};
+  InterviewCoachResult: {journeyId: string; roundNumber?: number; jobRole: string};
+  // Pitch Trainer routes
+  PitchTrainerMain: undefined;
+  PitchTrainerCreate: {
+    language?: string;
+    returnToRecord?: boolean;
+    existingPitchId?: string;
+    initialJobRole?: string;
+    initialNotes?: PitchNotes;
+  } | undefined;
+  PitchTrainerRecord: {
+    pitchId: string;
+    jobRole: string;
+    notes: PitchNotes;
+    language: string;
+  };
+  PitchTrainerFeedback: {
+    pitchId: string;
+    jobRole: string;
+    isView?: boolean;
+    initialPitch?: PersonalPitch;
+  };
 };
 
 export type AnalyzeStackParamList = {
@@ -42,6 +82,32 @@ export type AnalyzeStackParamList = {
     targetRole: string;
   };
   InterviewResult: {analysis: InterviewSessionRecord};
+  // Interview Coach routes
+  InterviewCoach: {resumeOngoingFromMenu?: boolean} | undefined;
+  InterviewSession: {journeyId: string; jobRole: string; isFirstTimeJobRole?: boolean};
+  InterviewFeedback: {journeyId: string; roundNumber: number; attempt: InterviewAttempt; jobRole: string};
+  InterviewCoachResult: {journeyId: string; roundNumber?: number; jobRole: string};
+  // Pitch Trainer routes
+  PitchTrainerMain: undefined;
+  PitchTrainerCreate: {
+    language?: string;
+    returnToRecord?: boolean;
+    existingPitchId?: string;
+    initialJobRole?: string;
+    initialNotes?: PitchNotes;
+  } | undefined;
+  PitchTrainerRecord: {
+    pitchId: string;
+    jobRole: string;
+    notes: PitchNotes;
+    language: string;
+  };
+  PitchTrainerFeedback: {
+    pitchId: string;
+    jobRole: string;
+    isView?: boolean;
+    initialPitch?: PersonalPitch;
+  };
 };
 
 export type HistoryStackParamList = {
@@ -92,6 +158,36 @@ const InterviewRecordingScreenWrapper = (props: any) => {
   return <InterviewRecordingScreen {...props} session={session!} />;
 };
 
+const InterviewCoachScreenV2Wrapper = (props: any) => {
+  const session = useSession();
+  return <InterviewCoachScreenV2 {...props} session={session!} />;
+};
+
+const InterviewSessionScreenWrapper = (props: any) => {
+  const session = useSession();
+  return <InterviewSessionScreen {...props} session={session!} />;
+};
+
+const PersonalPitchTrainerScreenWrapper = (props: any) => {
+  const session = useSession();
+  return <PersonalPitchTrainerScreen {...props} session={session!} />;
+};
+
+const PitchTrainerCreateScreenWrapper = (props: any) => {
+  const session = useSession();
+  return <PitchTrainerCreateScreen {...props} session={session!} />;
+};
+
+const PitchTrainerRecordScreenWrapper = (props: any) => {
+  const session = useSession();
+  return <PitchTrainerRecordScreen {...props} session={session!} />;
+};
+
+const PitchTrainerFeedbackScreenWrapper = (props: any) => {
+  const session = useSession();
+  return <PitchTrainerFeedbackScreen {...props} session={session!} />;
+};
+
 // --- Tab Stack Screens as stable component definitions ---
 const HomeTabScreen = () => {
   const {colors} = useTheme();
@@ -107,6 +203,16 @@ const HomeTabScreen = () => {
       <HomeStack.Screen name="InterviewSetup" component={InterviewSetupScreen} />
       <HomeStack.Screen name="InterviewRecording" component={InterviewRecordingScreenWrapper} />
       <HomeStack.Screen name="InterviewResult" component={InterviewResultScreen} />
+      {/* Interview Coach screens */}
+      <HomeStack.Screen name="InterviewCoach" component={InterviewCoachScreenV2Wrapper} />
+      <HomeStack.Screen name="InterviewSession" component={InterviewSessionScreenWrapper} />
+      <HomeStack.Screen name="InterviewFeedback" component={InterviewFeedbackScreen} />
+      <HomeStack.Screen name="InterviewCoachResult" component={InterviewCoachResultScreen} />
+      {/* Personal Pitch Trainer screens */}
+      <HomeStack.Screen name="PitchTrainerMain" component={PersonalPitchTrainerScreenWrapper} />
+      <HomeStack.Screen name="PitchTrainerCreate" component={PitchTrainerCreateScreenWrapper} />
+      <HomeStack.Screen name="PitchTrainerRecord" component={PitchTrainerRecordScreenWrapper} />
+      <HomeStack.Screen name="PitchTrainerFeedback" component={PitchTrainerFeedbackScreenWrapper} />
     </HomeStack.Navigator>
   );
 };
@@ -125,6 +231,16 @@ const AnalyzeTabScreen = () => {
       <AnalyzeStack.Screen name="InterviewSetup" component={InterviewSetupScreen} />
       <AnalyzeStack.Screen name="InterviewRecording" component={InterviewRecordingScreenWrapper} />
       <AnalyzeStack.Screen name="InterviewResult" component={InterviewResultScreen} />
+      {/* Interview Coach screens */}
+      <AnalyzeStack.Screen name="InterviewCoach" component={InterviewCoachScreenV2Wrapper} />
+      <AnalyzeStack.Screen name="InterviewSession" component={InterviewSessionScreenWrapper} />
+      <AnalyzeStack.Screen name="InterviewFeedback" component={InterviewFeedbackScreen} />
+      <AnalyzeStack.Screen name="InterviewCoachResult" component={InterviewCoachResultScreen} />
+      {/* Personal Pitch Trainer screens */}
+      <AnalyzeStack.Screen name="PitchTrainerMain" component={PersonalPitchTrainerScreenWrapper} />
+      <AnalyzeStack.Screen name="PitchTrainerCreate" component={PitchTrainerCreateScreenWrapper} />
+      <AnalyzeStack.Screen name="PitchTrainerRecord" component={PitchTrainerRecordScreenWrapper} />
+      <AnalyzeStack.Screen name="PitchTrainerFeedback" component={PitchTrainerFeedbackScreenWrapper} />
     </AnalyzeStack.Navigator>
   );
 };

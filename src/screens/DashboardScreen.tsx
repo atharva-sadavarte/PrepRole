@@ -113,7 +113,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
       ? Math.max(...recentScans.map(s => s.overall_score || 0))
       : 0;
 
-  const handleActionPress = (key: 'analyze' | 'interview' | 'history' | 'learning') => {
+  const handleActionPress = (key: 'analyze' | 'interview' | 'pitch' | 'history' | 'learning') => {
     if (key === 'analyze') {
       navigation
         .getParent()
@@ -123,7 +123,9 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
         .getParent()
         ?.navigate('HistoryTab', {screen: 'ScoreHistoryMain'});
     } else if (key === 'interview') {
-      navigation.navigate('InterviewSetup');
+      navigation.navigate('InterviewCoach', {resumeOngoingFromMenu: true});
+    } else if (key === 'pitch') {
+      navigation.navigate('PitchTrainerMain');
     } else {
       navigation
         .getParent()
@@ -671,9 +673,10 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
               </TouchableOpacity>
             </Animated.View>
 
-            {/* Companion Row: Mock Interview & Score History */}
+
+            {/* Companion Row: Interview Coach & Personal Pitch Trainer */}
             <View style={styles.splitRow}>
-              {/* Mock Interview */}
+              {/* Interview Coach */}
               <Animated.View
                 style={[
                   styles.splitCol,
@@ -719,12 +722,12 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                       styles.compactCardDesc,
                       {color: colors.textSecondary},
                     ]}>
-                    60-90s Intro Drill
+                    10-Round AI Journey
                   </Text>
                 </TouchableOpacity>
               </Animated.View>
 
-              {/* Score History */}
+              {/* Personal Pitch Trainer */}
               <Animated.View
                 style={[
                   styles.splitCol,
@@ -750,27 +753,27 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                     },
                   ]}
                   activeOpacity={0.85}
-                  onPress={() => handleActionPress('history')}>
+                  onPress={() => handleActionPress('pitch')}>
                   <LinearGradient
-                    colors={['#C25953', '#A84842']}
+                    colors={['#8B5CF6', '#6D28D9']}
                     style={styles.compactIconBg}
                     start={{x: 0, y: 0}}
                     end={{x: 1, y: 1}}>
-                    <Icon name="bar-chart" size={18} color="#FFFFFF" />
+                    <Icon name="videocam" size={18} color="#FFFFFF" />
                   </LinearGradient>
                   <Text
                     style={[
                       styles.compactCardTitle,
                       {color: colors.textPrimary},
                     ]}>
-                    Score Archive
+                    Pitch Trainer
                   </Text>
                   <Text
                     style={[
                       styles.compactCardDesc,
                       {color: colors.textSecondary},
                     ]}>
-                    View past reports
+                    6-Part Elevator Pitch
                   </Text>
                 </TouchableOpacity>
               </Animated.View>

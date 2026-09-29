@@ -2,12 +2,17 @@ package com.preprole.media
 
 import android.app.Activity
 import android.content.Intent
+import android.media.AudioAttributes
 import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.util.Base64
 import com.facebook.react.bridge.ActivityEventListener
 import com.facebook.react.bridge.BaseActivityEventListener
@@ -19,12 +24,15 @@ import com.facebook.react.bridge.WritableNativeMap
 import java.io.File
 import java.io.FileInputStream
 import java.io.InputStream
+import java.util.Locale
 
 class InterviewMediaModule(private val reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
 
     private var mediaRecorder: MediaRecorder? = null
     private var mediaPlayer: MediaPlayer? = null
+    private var textToSpeech: TextToSpeech? = null
+    private var isTtsInitialized: Boolean = false
     private var currentAudioFile: File? = null
     private var recordingStartTime: Long = 0L
 
@@ -93,6 +101,34 @@ class InterviewMediaModule(private val reactContext: ReactApplicationContext) :
 
     init {
         reactContext.addActivityEventListener(activityEventListener)
+        initTts(null)
+    }
+
+    private fun initTts(onReady: (() -> Unit)?) {
+        try {
+            textToSpeech = TextToSpeech(reactContext.applicationContext) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    isTtsInitialized = true
+                    try {
+                        textToSpeech?.language = Locale.US
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            val attrs = AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_MEDIA)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                                .build()
+                            textToSpeech?.setAudioAttributes(attrs)
+                        }
+                        textToSpeech?.setSpeechRate(0.83f)
+                        textToSpeech?.setPitch(1.0f)
+                    } catch (e: Exception) {}
+                    onReady?.invoke()
+                } else {
+                    isTtsInitialized = false
+                }
+            }
+        } catch (e: Exception) {
+            isTtsInitialized = false
+        }
     }
 
     override fun getName(): String = "InterviewMediaModule"
@@ -195,33 +231,47 @@ class InterviewMediaModule(private val reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun startAudioPlayback(uriString: String, promise: Promise) {
-        try {
-            stopAudioPlaybackInternal()
-
-            val player = MediaPlayer()
-            val uri = Uri.parse(uriString)
-
-            if (uri.scheme == "file") {
-                val filePath = uri.path ?: uriString.replace("file://", "")
-                player.setDataSource(filePath)
-            } else {
-                player.setDataSource(reactContext, uri)
-            }
-
-            player.setOnCompletionListener {
+        Thread {
+            try {
                 stopAudioPlaybackInternal()
-            }
-            player.prepare()
-            player.start()
-            mediaPlayer = player
 
-            val map = WritableNativeMap()
-            map.putBoolean("playing", true)
-            map.putInt("durationMs", player.duration)
-            promise.resolve(map)
-        } catch (e: Exception) {
-            promise.reject("ERR_PLAY_AUDIO", e.message, e)
-        }
+                val player = MediaPlayer()
+                val uri = Uri.parse(uriString)
+
+                if (uri.scheme == "file") {
+                    val filePath = uri.path ?: uriString.replace("file://", "")
+                    player.setDataSource(filePath)
+                } else {
+                    player.setDataSource(reactContext.applicationContext, uri)
+                }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    val attrs = AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                    player.setAudioAttributes(attrs)
+                }
+
+                player.setOnCompletionListener {
+                    stopAudioPlaybackInternal()
+                }
+                player.prepare()
+                player.start()
+                mediaPlayer = player
+
+                val map = WritableNativeMap()
+                map.putBoolean("playing", true)
+                map.putInt("durationMs", player.duration)
+                Handler(Looper.getMainLooper()).post {
+                    promise.resolve(map)
+                }
+            } catch (e: Exception) {
+                Handler(Looper.getMainLooper()).post {
+                    promise.reject("ERR_PLAY_AUDIO", e.message, e)
+                }
+            }
+        }.start()
     }
 
     @ReactMethod
@@ -304,5 +354,109 @@ class InterviewMediaModule(private val reactContext: ReactApplicationContext) :
             mediaPlayer?.release()
         } catch (e: Exception) {}
         mediaPlayer = null
+    }
+
+    @ReactMethod
+    fun speakText(text: String, languageTag: String, promise: Promise) {
+        speakTextInternal(text, languageTag, 0.83f, promise)
+    }
+
+    @ReactMethod
+    fun speakTextWithRate(text: String, languageTag: String, rate: Double, promise: Promise) {
+        val speechRate = if (rate in 0.5..2.0) rate.toFloat() else 0.83f
+        speakTextInternal(text, languageTag, speechRate, promise)
+    }
+
+    private fun speakTextInternal(text: String, languageTag: String, speechRate: Float, promise: Promise) {
+        Handler(Looper.getMainLooper()).post {
+            val doSpeak = {
+                val tts = textToSpeech
+                if (tts == null) {
+                    promise.reject("ERR_TTS_UNAVAILABLE", "TextToSpeech engine is not available")
+                } else {
+                    try {
+                        val locale = if (languageTag.isNotEmpty()) Locale.forLanguageTag(languageTag) else Locale.US
+                        tts.language = locale
+                    } catch (e: Exception) {
+                        tts.language = Locale.US
+                    }
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        val attrs = AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build()
+                        tts.setAudioAttributes(attrs)
+                    }
+                    tts.setSpeechRate(speechRate)
+                    tts.setPitch(1.0f)
+
+                    val utteranceId = "utterance_${System.currentTimeMillis()}"
+                    var isResolved = false
+
+                    tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                        override fun onStart(id: String?) {}
+                        override fun onDone(id: String?) {
+                            if (!isResolved && id == utteranceId) {
+                                isResolved = true
+                                val map = WritableNativeMap()
+                                map.putBoolean("success", true)
+                                map.putString("utteranceId", utteranceId)
+                                Handler(Looper.getMainLooper()).post {
+                                    promise.resolve(map)
+                                }
+                            }
+                        }
+                        override fun onError(id: String?) {
+                            if (!isResolved && id == utteranceId) {
+                                isResolved = true
+                                Handler(Looper.getMainLooper()).post {
+                                    promise.reject("ERR_TTS_PLAY", "TTS playback failed for $id")
+                                }
+                            }
+                        }
+                    })
+
+                    tts.stop()
+                    val res = tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+                    if (res != TextToSpeech.SUCCESS) {
+                        if (!isResolved) {
+                            isResolved = true
+                            promise.reject("ERR_TTS_QUEUE", "Failed to queue TTS utterance (code $res)")
+                        }
+                    } else {
+                        // Safety fallback timer if onDone is not invoked by engine
+                        val timeoutMs = Math.max(7000L, (text.length * 140).toLong())
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            if (!isResolved) {
+                                isResolved = true
+                                val map = WritableNativeMap()
+                                map.putBoolean("success", true)
+                                map.putString("utteranceId", utteranceId)
+                                promise.resolve(map)
+                            }
+                        }, timeoutMs)
+                    }
+                }
+            }
+
+            if (textToSpeech == null || !isTtsInitialized) {
+                initTts {
+                    doSpeak()
+                }
+            } else {
+                doSpeak()
+            }
+        }
+    }
+
+    @ReactMethod
+    fun stopSpeech(promise: Promise) {
+        try {
+            textToSpeech?.stop()
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERR_TTS_STOP", e.message, e)
+        }
     }
 }
