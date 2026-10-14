@@ -921,6 +921,16 @@ export const CVScoreResultScreen: React.FC<CVScoreResultScreenProps> = ({
           </View>
         </ScrollView>
       </LinearGradient>
+
+      {/* Paywall & Subscription Modal */}
+      <PaywallModal
+        visible={showPaywall}
+        currentCredits={creditsRemaining}
+        isPro={isPro}
+        reason={paywallReason}
+        onClose={closePaywall}
+        onSuccess={refreshQuota}
+      />
     </View>
   );
 };

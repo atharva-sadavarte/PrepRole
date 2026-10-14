@@ -23,13 +23,15 @@ export async function initPurchases(userId?: string): Promise<void> {
   try {
     Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.DEBUG : LOG_LEVEL.INFO);
 
-    if (Platform.OS === 'android') {
+    if (Platform.OS === 'android' || !REVENUECAT_PUBLIC_KEY.startsWith('goog_')) {
       Purchases.configure({
         apiKey: REVENUECAT_PUBLIC_KEY,
         appUserID: userId || null,
       });
       isConfigured = true;
       console.log('✅ RevenueCat initialized for user:', userId);
+    } else {
+      console.log('ℹ️ RevenueCat configured for Android Google Play (iOS StoreKit key can be added in purchases.ts)');
     }
   } catch (err) {
     console.warn('Failed to initialize RevenueCat:', err);

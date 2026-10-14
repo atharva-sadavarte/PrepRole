@@ -79,6 +79,7 @@ You've successfully run and modified your React Native App. :partying_face:
 
 ### Now what?
 
+- **Payment & Monetization Flow:** See [`docs/PAYMENT_FLOW.md`](file:///Volumes/CrucialX9/SelfDevelopment/PrepRole/docs/PAYMENT_FLOW.md) for the end-to-end Google Play, RevenueCat, and Supabase payment architecture.
 - If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
 - If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
 

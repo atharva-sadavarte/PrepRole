@@ -53,16 +53,32 @@ Deno.serve(async (req: Request) => {
     console.log(`Processing RevenueCat event: ${eventType} for user: ${appUserId} (${productId})`);
 
     // Handle Subscription events
-    if (eventType === "INITIAL_PURCHASE" || eventType === "RENEWAL") {
+    if (
+      eventType === "INITIAL_PURCHASE" ||
+      eventType === "RENEWAL" ||
+      eventType === "PRODUCT_CHANGE" ||
+      eventType === "UNCANCELLATION"
+    ) {
       const proUntil = expirationMs ? new Date(expirationMs).toISOString() : null;
-      await supabaseAdmin
+      const { error: updateErr } = await supabaseAdmin
         .from("user_quotas")
-        .upsert({
-          user_id: appUserId,
+        .update({
           plan_type: "pro",
           pro_until: proUntil,
           updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", appUserId);
+
+      // If user quota record didn't exist yet, insert fresh record
+      if (updateErr) {
+        await supabaseAdmin.from("user_quotas").upsert({
+          user_id: appUserId,
+          plan_type: "pro",
+          pro_until: proUntil,
+          credits_remaining: 3,
+          updated_at: new Date().toISOString(),
         });
+      }
     } else if (eventType === "EXPIRATION") {
       await supabaseAdmin
         .from("user_quotas")

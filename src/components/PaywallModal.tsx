@@ -57,6 +57,31 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
     }
   }, [visible]);
 
+  // Robust package matching for RevenueCat Google Play / App Store offerings
+  const monthlyPkg = packages.find(
+    pkg =>
+      pkg.packageType === 'MONTHLY' ||
+      pkg.identifier === '$rc_monthly' ||
+      pkg.identifier.toLowerCase().includes('monthly') ||
+      pkg.identifier.toLowerCase().includes('pro') ||
+      pkg.product?.identifier?.toLowerCase().includes('monthly') ||
+      pkg.product?.identifier?.toLowerCase().includes('pro'),
+  );
+
+  const packPkg = packages.find(
+    pkg =>
+      pkg.packageType === 'CUSTOM' ||
+      pkg.identifier === '$rc_custom' ||
+      pkg.identifier.toLowerCase().includes('pack') ||
+      pkg.identifier.toLowerCase().includes('scan') ||
+      pkg.identifier.includes('5') ||
+      pkg.product?.identifier?.toLowerCase().includes('pack') ||
+      pkg.product?.identifier?.toLowerCase().includes('scan'),
+  );
+
+  const monthlyPrice = monthlyPkg?.product?.priceString || '$4.99';
+  const packPrice = packPkg?.product?.priceString || '$1.99';
+
   const handlePurchase = async () => {
     if (isPro) {
       Alert.alert(
@@ -69,21 +94,7 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
 
     setLoading(true);
     try {
-      // Find matching RevenueCat package if loaded from Google Play
-      const targetPkg = packages.find(pkg => {
-        if (selectedPlan === 'monthly') {
-          return (
-            pkg.packageType === 'MONTHLY' ||
-            pkg.identifier.toLowerCase().includes('monthly') ||
-            pkg.identifier.toLowerCase().includes('pro')
-          );
-        }
-        return (
-          pkg.packageType === 'CUSTOM' ||
-          pkg.identifier.toLowerCase().includes('pack') ||
-          pkg.identifier.toLowerCase().includes('5')
-        );
-      });
+      const targetPkg = selectedPlan === 'monthly' ? monthlyPkg : packPkg;
 
       if (targetPkg) {
         // Trigger real native Google Play Billing dialog
@@ -91,9 +102,19 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
         setLoading(false);
         if (result.success) {
           Alert.alert(
-            'Upgrade Successful!',
-            'Thank you for upgrading to PrepRole Pro! Your account now has full unlimited access.',
-            [{text: 'Continue', onPress: () => { onClose(); onSuccess?.(); }}],
+            selectedPlan === 'monthly' ? 'Upgrade Successful!' : 'Pack Purchased!',
+            selectedPlan === 'monthly'
+              ? 'Thank you for upgrading to PrepRole Pro! Your account now has full unlimited access.'
+              : '5 resume scans have been added to your account balance.',
+            [
+              {
+                text: 'Continue',
+                onPress: () => {
+                  onClose();
+                  onSuccess?.();
+                },
+              },
+            ],
           );
         }
         return;
@@ -109,15 +130,20 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
             : 'RevenueCat initialized. In production, this triggers your one-time 5-scan purchase via Google Play Billing.',
           [
             {
-              text: 'Got It',
+              text: 'Simulate Upgrade (Dev)',
               onPress: () => {
                 onClose();
                 onSuccess?.();
               },
             },
+            {
+              text: 'Close',
+              style: 'cancel',
+              onPress: onClose,
+            },
           ],
         );
-      }, 600);
+      }, 500);
     } catch (err: any) {
       setLoading(false);
       Alert.alert('Purchase Incomplete', err.message || 'The purchase could not be completed. Please try again.');
@@ -255,7 +281,7 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
 
                 <View style={styles.priceCol}>
                   <Text style={[styles.priceAmount, {color: colors.primaryStart}]}>
-                    $4.99
+                    {monthlyPrice}
                   </Text>
                   <Text style={[styles.pricePeriod, {color: colors.textMuted}]}>
                     / month
@@ -339,7 +365,7 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
 
                 <View style={styles.priceCol}>
                   <Text style={[styles.priceAmount, {color: colors.primaryStart}]}>
-                    $1.99
+                    {packPrice}
                   </Text>
                   <Text style={[styles.pricePeriod, {color: colors.textMuted}]}>
                     one-time
@@ -380,7 +406,11 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
                   <>
                     <Icon name="shield-checkmark" size={18} color="#FFFFFF" />
                     <Text style={styles.ctaText}>
-                      {isPro ? 'Pro Subscription Active' : 'Continue with Google Play'}
+                      {isPro
+                        ? 'Pro Subscription Active'
+                        : selectedPlan === 'monthly'
+                        ? `Get Unlimited Pro • ${monthlyPrice}/mo`
+                        : `Get 5 Scans • ${packPrice}`}
                     </Text>
                   </>
                 )}

@@ -164,12 +164,21 @@ showSplash → SplashScreen
 
 ## User Quotas & Monetization (Paywall)
 
+```
+[ User App ] ──► [ Google Play / UPI ] ──► [ RevenueCat ] ──► [ Supabase Webhook ] ──► [ User Ban Gaya PRO ]
+                       │
+                       ▼
+             [ Aapka Bank Account ]
+```
+
+- **Detailed Documentation:** See [`docs/PAYMENT_FLOW.md`](file:///Volumes/CrucialX9/SelfDevelopment/PrepRole/docs/PAYMENT_FLOW.md) for the complete lifecycle & payout breakdown.
 - **Free Tier:** New signups automatically receive **3 free CV scans** via database trigger (`handle_new_user_quota`).
 - **Server Enforcement:** The `analyze-cv` Edge Function validates user JWT and executes `deduct_user_scan` **before** invoking Gemini.
 - **Zero-Trust Client:** Clients cannot grant themselves Pro or add credits. Quotas are strictly managed server-side.
 - **Quota Exceeded:** Returns HTTP `403` with `error: "QUOTA_EXCEEDED"`. Mobile app catches this to automatically open `PaywallModal`.
 - **Pro Tier:** Unlimited scans (`plan_type = 'pro'`).
 - **RevenueCat Webhooks:** Endpoint `revenuecat-webhook` handles Google Play purchase/renewal/expiration events and syncs with `user_quotas`.
+- **Zero Upfront Cost:** No pre-upgrades needed for Supabase or Gemini before monetizing users.
 
 ---
 
