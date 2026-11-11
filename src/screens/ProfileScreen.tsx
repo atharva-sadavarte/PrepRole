@@ -12,6 +12,7 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  Linking,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {GoogleSignin} from '@react-native-google-signin/google-signin';
@@ -19,10 +20,13 @@ import {supabase} from '../lib/supabase';
 import {useTheme} from '../context/ThemeContext';
 import {COLORS, SPACING, RADIUS, ICON_SIZES, FONTS, SHADOWS} from '../lib/theme';
 import {getUserAnalyses} from '../services/resumeService';
-import {restorePurchases} from '../services/purchaseService';
+import {restorePurchases, logoutPurchases} from '../services/purchaseService';
 import {useQuota} from '../context/QuotaContext';
 import PaywallModal from '../components/PaywallModal';
 import Icon from '../components/Icon';
+import ForgotPasswordModal from '../components/ForgotPasswordModal';
+import LegalDocumentModal, {LegalDocumentType} from '../components/LegalDocumentModal';
+import {LEGAL_CONFIG} from '../config/legal';
 import OnboardingScreen from './OnboardingScreen';
 import type {Session} from '@supabase/supabase-js';
 
@@ -52,6 +56,8 @@ const ProfileScreen = ({session}: ProfileScreenProps) => {
   const [showSignOutModal, setShowSignOutModal] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [showTourModal, setShowTourModal] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [legalModalType, setLegalModalType] = useState<LegalDocumentType | null>(null);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -138,6 +144,11 @@ const ProfileScreen = ({session}: ProfileScreenProps) => {
       } catch {
         // Google sign out may fail if not signed in via Google
       }
+      try {
+        await logoutPurchases();
+      } catch {
+        // Ignore RevenueCat logout errors
+      }
       await supabase.auth.signOut();
     } catch (err) {
       console.error('Error signing out:', err);
@@ -196,6 +207,11 @@ const ProfileScreen = ({session}: ProfileScreenProps) => {
       onPress: () => setShowTourModal(true),
     },
     {
+      icon: 'lock-closed-outline',
+      label: 'Change / Reset Password',
+      onPress: () => setShowResetModal(true),
+    },
+    {
       icon: 'refresh-outline',
       label: 'Restore Purchases',
       onPress: handleRestorePurchases,
@@ -203,22 +219,12 @@ const ProfileScreen = ({session}: ProfileScreenProps) => {
     {
       icon: 'shield-checkmark-outline',
       label: 'Privacy Policy',
-      onPress: () => {
-        Alert.alert(
-          'Privacy Policy',
-          'PrepRole respects your privacy. Your uploaded resumes and generated evaluations are encrypted and strictly protected. We do not sell or share personal data.',
-        );
-      },
+      onPress: () => setLegalModalType('privacy'),
     },
     {
       icon: 'document-text-outline',
       label: 'Terms of Service',
-      onPress: () => {
-        Alert.alert(
-          'Terms of Service',
-          'By using PrepRole, you agree to our standard terms of use. Subscription billing is managed securely via Google Play.',
-        );
-      },
+      onPress: () => setLegalModalType('terms'),
     },
     {
       icon: 'help-circle-outline',
@@ -226,7 +232,17 @@ const ProfileScreen = ({session}: ProfileScreenProps) => {
       onPress: () => {
         Alert.alert(
           'Help & Support',
-          'Have questions, feedback, or need help? Reach out to support at support@preprole.com.',
+          `Have questions, feedback, or need help?\n\nReach out to developer Atharva Sadavarte at ${LEGAL_CONFIG.supportEmail}`,
+          [
+            {text: 'Cancel', style: 'cancel'},
+            {
+              text: 'Email Support',
+              onPress: () =>
+                Linking.openURL(
+                  `mailto:${LEGAL_CONFIG.supportEmail}?subject=PrepRole%20Support`,
+                ),
+            },
+          ],
         );
       },
     },
@@ -895,6 +911,29 @@ const ProfileScreen = ({session}: ProfileScreenProps) => {
         onClose={closePaywall}
         onSuccess={refreshQuota}
       />
+
+      {/* Change / Reset Password Modal */}
+      <ForgotPasswordModal
+        visible={showResetModal}
+        initialEmail={userEmail || ''}
+        onClose={() => setShowResetModal(false)}
+        onSuccess={() => {
+          setShowResetModal(false);
+          Alert.alert(
+            'Password Updated',
+            'Your account password has been updated successfully.',
+          );
+        }}
+      />
+
+      {/* Legal Documents Modal (Privacy Policy & Terms of Service) */}
+      {legalModalType && (
+        <LegalDocumentModal
+          visible={Boolean(legalModalType)}
+          type={legalModalType}
+          onClose={() => setLegalModalType(null)}
+        />
+      )}
     </View>
   );
 };

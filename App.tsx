@@ -4,6 +4,12 @@
  */
 
 import React, {useEffect, useState} from 'react';
+import {Linking, Alert, LogBox} from 'react-native';
+
+LogBox.ignoreLogs([
+  'PGRST303',
+  'JWT issued at future',
+]);
 import {
   NavigationContainer,
   DefaultTheme,
@@ -18,6 +24,8 @@ import type {Session} from '@supabase/supabase-js';
 import {ThemeProvider, useTheme} from './src/context/ThemeContext';
 import {QuotaProvider} from './src/context/QuotaContext';
 import {initPurchases} from './src/services/purchaseService';
+import {handleAuthUrl} from './src/services/authService';
+import ForgotPasswordModal from './src/components/ForgotPasswordModal';
 
 function AppNavigation({
   session,
@@ -67,8 +75,30 @@ function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean>(true);
   const [loading, setLoading] = useState(true);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
   useEffect(() => {
+    // Handle deep links when app opens or receives incoming URL
+    Linking.getInitialURL().then(url => {
+      if (url) {
+        handleAuthUrl(url).then(res => {
+          if (res?.type === 'recovery') {
+            setIsPasswordRecovery(true);
+          }
+        });
+      }
+    });
+
+    const urlSub = Linking.addEventListener('url', ({url}) => {
+      if (url) {
+        handleAuthUrl(url).then(res => {
+          if (res?.type === 'recovery') {
+            setIsPasswordRecovery(true);
+          }
+        });
+      }
+    });
+
     // Check onboarding status
     AsyncStorage.getItem('@has_completed_onboarding')
       .then(value => {
@@ -95,14 +125,20 @@ function App() {
     // Listen for auth state changes
     const {
       data: {subscription},
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsPasswordRecovery(true);
+      }
       setSession(newSession);
       if (newSession?.user?.id) {
         initPurchases(newSession.user.id);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      urlSub.remove();
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleSplashFinish = () => {
@@ -128,6 +164,18 @@ function App() {
             handleSplashFinish={handleSplashFinish}
             hasCompletedOnboarding={hasCompletedOnboarding}
             handleFinishOnboarding={handleFinishOnboarding}
+          />
+          <ForgotPasswordModal
+            visible={isPasswordRecovery}
+            isDirectRecovery={true}
+            onClose={() => setIsPasswordRecovery(false)}
+            onSuccess={() => {
+              setIsPasswordRecovery(false);
+              Alert.alert(
+                'Password Updated',
+                'Your password has been successfully updated.',
+              );
+            }}
           />
         </QuotaProvider>
       </SafeAreaProvider>

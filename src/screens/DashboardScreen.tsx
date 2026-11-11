@@ -63,7 +63,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
         setRecentScans(scans);
         refreshQuota();
       } catch (err) {
-        console.error('Error fetching dashboard data:', err);
+        console.warn('Dashboard scans notice:', err);
       }
     };
     fetchScans();

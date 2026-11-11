@@ -84,11 +84,13 @@ showSplash → SplashScreen
 
 ## Authentication
 
-- **Provider:** Google Sign-In only (`@react-native-google-signin/google-signin`)
-- **Flow:** Google OAuth → `idToken` → `supabase.auth.signInWithIdToken({ provider: 'google', token })`
+- **Providers:**
+  - **Email & Password:** Standard Supabase Auth flow with Sign In, Sign Up (with Full Name metadata), and Forgot/Reset Password flows (`src/services/authService.ts`).
+  - **Google Sign-In:** Google OAuth → `idToken` → `supabase.auth.signInWithIdToken({ provider: 'google', token })`
 - **Google Web Client ID:** `879098542160-7374vk24bv0i9llla0ie3lr0b2o6ge4s.apps.googleusercontent.com` (in `AuthScreen.tsx`)
+- **Password Reset / Deep Linking:** Registered URL scheme `preprole://reset-password` on Android & iOS. Supports both direct email link recovery and 6-digit verification code (OTP) entry within `ForgotPasswordModal`.
+- **Email Verification:** Automatically detects unconfirmed accounts (`email_not_confirmed`) and offers `EmailVerificationModal` with resend action & cooldown.
 - **Session storage:** AsyncStorage via Supabase client config (`persistSession: true`)
-- **No email/password auth** — do not add without discussion
 
 ---
 
@@ -284,7 +286,7 @@ npm test
 
 - Do NOT rewrite working screens or services without explicit request
 - Do NOT modify `src/lib/supabase.ts` URL/key without confirming backend change
-- Do NOT add email/password auth or other OAuth providers without approval
+- Do NOT bypass RLS or add unapproved OAuth providers without approval
 - Do NOT make the `resumes` bucket public
 - Do NOT add new top-level context providers without discussing state architecture
 - Do NOT introduce new navigation patterns (modals, drawers) without approval

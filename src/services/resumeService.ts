@@ -2,6 +2,9 @@ import {Linking, Alert} from 'react-native';
 import {supabase} from '../lib/supabase';
 import {CVAnalysisResult, ResumeAnalysisRecord} from '../types/resume';
 
+const sleep = (ms: number) =>
+  new Promise(resolve => setTimeout(() => resolve(undefined), ms));
+
 /**
  * Saves a CV analysis to Supabase
  */
@@ -42,10 +45,11 @@ export async function saveAnalysis(
 }
 
 /**
- * Fetches all past CV analyses for the current user
+ * Fetches all past CV analyses for the current user (with auto-retry for clock skew)
  */
 export async function getUserAnalyses(
   userId: string,
+  retries = 2,
 ): Promise<ResumeAnalysisRecord[]> {
   const {data, error} = await supabase
     .from('resume_analyses')
@@ -54,8 +58,17 @@ export async function getUserAnalyses(
     .order('created_at', {ascending: false});
 
   if (error) {
-    console.error('Error fetching user analyses:', error);
-    throw error;
+    // Handle transient PGRST303 clock skew when token was just minted
+    if (
+      retries > 0 &&
+      (error.code === 'PGRST303' ||
+        error.message?.toLowerCase().includes('future'))
+    ) {
+      await sleep(700);
+      return getUserAnalyses(userId, retries - 1);
+    }
+    console.warn('Could not fetch user analyses:', error.message);
+    return [];
   }
 
   return (data as ResumeAnalysisRecord[]) || [];

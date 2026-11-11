@@ -3,8 +3,17 @@ import Purchases, {
   CustomerInfo,
   LOG_LEVEL,
 } from 'react-native-purchases';
-import {Platform} from 'react-native';
+import {Platform, LogBox} from 'react-native';
 import {REVENUECAT_PUBLIC_KEY} from '../config/purchases';
+
+// Ignore RevenueCat setup warnings in dev so RedBox / LogBox modals don't pop up
+// while Google Play Console products are in draft/pending review.
+LogBox.ignoreLogs([
+  '[RevenueCat]',
+  'PurchasesError',
+  "There's a problem with your configuration",
+  'None of the products registered in the RevenueCat dashboard',
+]);
 
 let isConfigured = false;
 
@@ -21,6 +30,18 @@ export async function initPurchases(userId?: string): Promise<void> {
   }
 
   try {
+    // Custom log handler: route error logs to console.warn instead of console.error
+    // so React Native doesn't trigger the intrusive full-screen RedBox error modal.
+    Purchases.setLogHandler((logLevel, message) => {
+      if (logLevel === LOG_LEVEL.ERROR || logLevel === LOG_LEVEL.WARN) {
+        console.warn(`[RevenueCat] ${message}`);
+      } else if (logLevel === LOG_LEVEL.INFO) {
+        console.info(`[RevenueCat] ${message}`);
+      } else {
+        console.debug(`[RevenueCat] ${message}`);
+      }
+    });
+
     Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.DEBUG : LOG_LEVEL.INFO);
 
     if (Platform.OS === 'android' || !REVENUECAT_PUBLIC_KEY.startsWith('goog_')) {
@@ -48,8 +69,10 @@ export async function getOfferings(): Promise<PurchasesPackage[]> {
       return offerings.current.availablePackages;
     }
     return [];
-  } catch (err) {
-    console.warn('Error fetching RevenueCat offerings:', err);
+  } catch (err: any) {
+    // When Google Play products are still in draft or not yet linked in Play Console,
+    // getOfferings throws a ConfigurationError. We log it cleanly as info.
+    console.log('ℹ️ RevenueCat offerings not active on Play Store yet:', err?.message || err);
     return [];
   }
 }
@@ -95,5 +118,19 @@ export async function checkProEntitlement(): Promise<boolean> {
     return !!info?.entitlements?.active?.pro;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Resets user session in RevenueCat upon app logout
+ */
+export async function logoutPurchases(): Promise<void> {
+  try {
+    if (isConfigured) {
+      await Purchases.logOut();
+      console.log('✅ RevenueCat user logged out');
+    }
+  } catch (err) {
+    console.warn('Failed to logout RevenueCat session:', err);
   }
 }
