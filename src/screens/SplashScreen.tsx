@@ -1,4 +1,4 @@
-import React, {useEffect, useRef} from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,14 @@ import {
   StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import {useTheme} from '../context/ThemeContext';
-import {COLORS, SPACING, ICON_SIZES, FONTS} from '../lib/theme';
+import { useTheme } from '../context/ThemeContext';
+import { COLORS, SPACING, ICON_SIZES, FONTS } from '../lib/theme';
 import Icon from '../components/Icon';
 
-const {width, height} = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
-const SplashScreen = ({onFinish}: {onFinish: () => void}) => {
-  const {colors, isDark} = useTheme();
+const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
+  const { colors, isDark } = useTheme();
   const logoScale = useRef(new Animated.Value(0.3)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const titleOpacity = useRef(new Animated.Value(0)).current;
@@ -26,7 +26,7 @@ const SplashScreen = ({onFinish}: {onFinish: () => void}) => {
 
   useEffect(() => {
     // Glow behind logo
-    Animated.loop(
+    const glowAnim = Animated.loop(
       Animated.sequence([
         Animated.timing(glowOpacity, {
           toValue: 0.6,
@@ -39,144 +39,148 @@ const SplashScreen = ({onFinish}: {onFinish: () => void}) => {
           useNativeDriver: true,
         }),
       ]),
-    ).start();
+    );
+  glowAnim.start();
 
-    // Pulse animation for the logo icon
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.06,
-          duration: 900,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 900,
-          useNativeDriver: true,
-        }),
-      ]),
-    ).start();
+  // Pulse animation for the logo icon
+    const pulseAnimLoop = Animated.loop(
+    Animated.sequence([
+      Animated.timing(pulseAnim, {
+        toValue: 1.06,
+        duration: 900,
+        useNativeDriver: true,
+      }),
+      Animated.timing(pulseAnim, {
+        toValue: 1,
+        duration: 900,
+        useNativeDriver: true,
+      }),
+    ]),
+    );
+pulseAnimLoop.start();
 
-    // Main animation sequence
+// Main animation sequence
+Animated.parallel([
+  // Logo appears with smooth spring & fade
+  Animated.parallel([
+    Animated.spring(logoScale, {
+      toValue: 1,
+      tension: 45,
+      friction: 6,
+      useNativeDriver: true,
+    }),
+    Animated.timing(logoOpacity, {
+      toValue: 1,
+      duration: 450,
+      useNativeDriver: true,
+    }),
+  ]),
+  // Title slides up smoothly
+  Animated.sequence([
+    Animated.delay(200),
     Animated.parallel([
-      // Logo appears with smooth spring & fade
-      Animated.parallel([
-        Animated.spring(logoScale, {
-          toValue: 1,
-          tension: 45,
-          friction: 6,
-          useNativeDriver: true,
-        }),
-        Animated.timing(logoOpacity, {
-          toValue: 1,
-          duration: 450,
-          useNativeDriver: true,
-        }),
-      ]),
-      // Title slides up smoothly
-      Animated.sequence([
-        Animated.delay(200),
-        Animated.parallel([
-          Animated.timing(titleOpacity, {
-            toValue: 1,
-            duration: 450,
-            useNativeDriver: true,
-          }),
-          Animated.timing(titleTranslateY, {
-            toValue: 0,
-            duration: 450,
-            useNativeDriver: true,
-          }),
-        ]),
-      ]),
-      // Subtitle fades in
-      Animated.sequence([
-        Animated.delay(400),
-        Animated.timing(subtitleOpacity, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start();
+      Animated.timing(titleOpacity, {
+        toValue: 1,
+        duration: 450,
+        useNativeDriver: true,
+      }),
+      Animated.timing(titleTranslateY, {
+        toValue: 0,
+        duration: 450,
+        useNativeDriver: true,
+      }),
+    ]),
+  ]),
+  // Subtitle fades in
+  Animated.sequence([
+    Animated.delay(400),
+    Animated.timing(subtitleOpacity, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }),
+  ]),
+]).start();
 
-    // Exactly 2 seconds (2000 ms) screen time before transitioning
-    const timer = setTimeout(() => {
-      onFinish();
-    }, 2000);
+// Exactly 2 seconds (2000 ms) screen time before transitioning
+const timer = setTimeout(() => {
+  onFinish();
+}, 2000);
 
-    return () => {
-      clearTimeout(timer);
-    };
+return () => {
+  clearTimeout(timer);
+  glowAnim.stop();
+  pulseAnimLoop.stop();
+};
   }, [
-    glowOpacity,
-    logoOpacity,
-    logoScale,
-    onFinish,
-    pulseAnim,
-    subtitleOpacity,
-    titleOpacity,
-    titleTranslateY,
-  ]);
+  glowOpacity,
+  logoOpacity,
+  logoScale,
+  onFinish,
+  pulseAnim,
+  subtitleOpacity,
+  titleOpacity,
+  titleTranslateY,
+]);
 
-  return (
-    <View style={styles.container}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-      <LinearGradient
-        colors={[colors.bgDark, colors.gradientMiddle, colors.gradientEnd]}
-        style={styles.gradient}>
-        {/* Decorative circles */}
-        <View style={[styles.decorCircle, styles.decorCircle1]} />
-        <View style={[styles.decorCircle, styles.decorCircle2]} />
-        <View style={[styles.decorCircle, styles.decorCircle3]} />
+return (
+  <View style={styles.container}>
+    <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+    <LinearGradient
+      colors={[colors.bgDark, colors.gradientMiddle, colors.gradientEnd]}
+      style={styles.gradient}>
+      {/* Decorative circles */}
+      <View style={[styles.decorCircle, styles.decorCircle1]} />
+      <View style={[styles.decorCircle, styles.decorCircle2]} />
+      <View style={[styles.decorCircle, styles.decorCircle3]} />
 
-        {/* Glow behind logo */}
-        <Animated.View style={[styles.glow, {opacity: glowOpacity}]} />
+      {/* Glow behind logo */}
+      <Animated.View style={[styles.glow, { opacity: glowOpacity }]} />
 
-        {/* Logo */}
-        <Animated.View
-          style={[
-            styles.logoContainer,
-            {
-              transform: [{scale: Animated.multiply(logoScale, pulseAnim)}],
-              opacity: logoOpacity,
-            },
-          ]}>
-          <LinearGradient
-            colors={[colors.primaryStart, colors.primaryEnd]}
-            style={styles.logoGradient}
-            start={{x: 0, y: 0}}
-            end={{x: 1, y: 1}}>
-            <Icon
-              name="rocket"
-              size={ICON_SIZES.hero}
-              color="#FFFFFF"
-            />
-          </LinearGradient>
-        </Animated.View>
+      {/* Logo */}
+      <Animated.View
+        style={[
+          styles.logoContainer,
+          {
+            transform: [{ scale: Animated.multiply(logoScale, pulseAnim) }],
+            opacity: logoOpacity,
+          },
+        ]}>
+        <LinearGradient
+          colors={[colors.primaryStart, colors.primaryEnd]}
+          style={styles.logoGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}>
+          <Icon
+            name="rocket"
+            size={ICON_SIZES.hero}
+            color="#FFFFFF"
+          />
+        </LinearGradient>
+      </Animated.View>
 
-        {/* Title */}
-        <Animated.View
-          style={{
-            opacity: titleOpacity,
-            transform: [{translateY: titleTranslateY}],
-          }}>
-          <Text style={[styles.title, {color: colors.textPrimary}]}>
-            PrepRole
-          </Text>
-        </Animated.View>
+      {/* Title */}
+      <Animated.View
+        style={{
+          opacity: titleOpacity,
+          transform: [{ translateY: titleTranslateY }],
+        }}>
+        <Text style={[styles.title, { color: colors.textPrimary }]}>
+          PrepRole
+        </Text>
+      </Animated.View>
 
-        {/* Subtitle */}
-        <Animated.Text
-          style={[
-            styles.subtitle,
-            {opacity: subtitleOpacity, color: colors.textSecondary},
-          ]}>
-          Ace your next interview
-        </Animated.Text>
-      </LinearGradient>
-    </View>
-  );
+      {/* Subtitle */}
+      <Animated.Text
+        style={[
+          styles.subtitle,
+          { opacity: subtitleOpacity, color: colors.textSecondary },
+        ]}>
+        Ace your next interview
+      </Animated.Text>
+    </LinearGradient>
+  </View>
+);
 };
 
 const styles = StyleSheet.create({
@@ -221,7 +225,7 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     backgroundColor: COLORS.primaryStart,
     shadowColor: COLORS.primaryStart,
-    shadowOffset: {width: 0, height: 0},
+    shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 60,
     elevation: 20,
@@ -236,7 +240,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: COLORS.primaryStart,
-    shadowOffset: {width: 0, height: 8},
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,
     shadowRadius: 20,
     elevation: 15,
