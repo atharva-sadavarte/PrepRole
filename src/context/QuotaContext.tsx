@@ -7,9 +7,16 @@ import React, {
   ReactNode,
 } from 'react';
 import {getUserQuota} from '../services/quotaService';
-import {checkProEntitlement} from '../services/purchaseService';
+import {
+  checkProEntitlement,
+  getOfferings,
+  findMonthlyPackage,
+  findScanPackPackage,
+  getLocalizedFallbackPrice,
+} from '../services/purchaseService';
 import {UserQuota} from '../types/resume';
 import type {Session} from '@supabase/supabase-js';
+import type {PurchasesPackage} from 'react-native-purchases';
 
 export type PaywallReason = 'out_of_credits' | 'upgrade' | 'pro_info';
 
@@ -24,6 +31,9 @@ interface QuotaContextType {
   paywallReason: PaywallReason;
   openPaywall: (reason?: PaywallReason) => void;
   closePaywall: () => void;
+  monthlyPrice: string;
+  packPrice: string;
+  packages: PurchasesPackage[];
 }
 
 const defaultQuota: UserQuota = {
@@ -33,6 +43,8 @@ const defaultQuota: UserQuota = {
   lifetime_scans_used: 0,
   pro_until: null,
 };
+
+const initialFallback = getLocalizedFallbackPrice();
 
 const QuotaContext = createContext<QuotaContextType>({
   quota: defaultQuota,
@@ -45,6 +57,9 @@ const QuotaContext = createContext<QuotaContextType>({
   paywallReason: 'upgrade',
   openPaywall: () => {},
   closePaywall: () => {},
+  monthlyPrice: initialFallback.monthly,
+  packPrice: initialFallback.pack,
+  packages: [],
 });
 
 interface QuotaProviderProps {
@@ -60,6 +75,32 @@ export const QuotaProvider: React.FC<QuotaProviderProps> = ({
   const [loading, setLoading] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [paywallReason, setPaywallReason] = useState<PaywallReason>('upgrade');
+  const [packages, setPackages] = useState<PurchasesPackage[]>([]);
+  const [monthlyPrice, setMonthlyPrice] = useState<string>(initialFallback.monthly);
+  const [packPrice, setPackPrice] = useState<string>(initialFallback.pack);
+
+  const loadPackagesAndPrices = useCallback(async () => {
+    try {
+      const pkgs = await getOfferings();
+      if (pkgs && pkgs.length > 0) {
+        setPackages(pkgs);
+        const mPkg = findMonthlyPackage(pkgs);
+        const pPkg = findScanPackPackage(pkgs);
+        if (mPkg?.product?.priceString) {
+          setMonthlyPrice(mPkg.product.priceString);
+        }
+        if (pPkg?.product?.priceString) {
+          setPackPrice(pPkg.product.priceString);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPackagesAndPrices();
+  }, [loadPackagesAndPrices]);
 
   const refreshQuota = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -68,6 +109,7 @@ export const QuotaProvider: React.FC<QuotaProviderProps> = ({
       const [userQuota, isRevenueCatPro] = await Promise.all([
         getUserQuota(session.user.id),
         checkProEntitlement(),
+        loadPackagesAndPrices(),
       ]);
 
       if (userQuota) {
@@ -89,7 +131,7 @@ export const QuotaProvider: React.FC<QuotaProviderProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, loadPackagesAndPrices]);
 
   useEffect(() => {
     if (session?.user?.id) {
@@ -124,6 +166,9 @@ export const QuotaProvider: React.FC<QuotaProviderProps> = ({
         paywallReason,
         openPaywall,
         closePaywall,
+        monthlyPrice,
+        packPrice,
+        packages,
       }}>
       {children}
     </QuotaContext.Provider>

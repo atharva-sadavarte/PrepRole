@@ -20,7 +20,11 @@ import {
   getOfferings,
   purchasePackage,
   restorePurchases,
+  findMonthlyPackage,
+  findScanPackPackage,
+  getLocalizedFallbackPrice,
 } from '../services/purchaseService';
+import {useQuota} from '../context/QuotaContext';
 
 const {width} = Dimensions.get('window');
 
@@ -45,42 +49,36 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const {colors, isDark} = useTheme();
+  const {packages: contextPackages, monthlyPrice: contextMonthlyPrice, packPrice: contextPackPrice} = useQuota();
   const [selectedPlan, setSelectedPlan] = useState<PlanType>('monthly');
   const [loading, setLoading] = useState(false);
-  const [packages, setPackages] = useState<PurchasesPackage[]>([]);
+  const [packages, setPackages] = useState<PurchasesPackage[]>(contextPackages || []);
+
+  useEffect(() => {
+    if (contextPackages && contextPackages.length > 0) {
+      setPackages(contextPackages);
+    }
+  }, [contextPackages]);
 
   useEffect(() => {
     if (visible) {
       getOfferings().then(pkgs => {
-        setPackages(pkgs);
+        if (pkgs && pkgs.length > 0) {
+          setPackages(pkgs);
+        }
       });
     }
   }, [visible]);
 
   // Robust package matching for RevenueCat Google Play / App Store offerings
-  const monthlyPkg = packages.find(
-    pkg =>
-      pkg.packageType === 'MONTHLY' ||
-      pkg.identifier === '$rc_monthly' ||
-      pkg.identifier.toLowerCase().includes('monthly') ||
-      pkg.identifier.toLowerCase().includes('pro') ||
-      pkg.product?.identifier?.toLowerCase().includes('monthly') ||
-      pkg.product?.identifier?.toLowerCase().includes('pro'),
-  );
+  const monthlyPkg = findMonthlyPackage(packages);
+  const packPkg = findScanPackPackage(packages);
 
-  const packPkg = packages.find(
-    pkg =>
-      pkg.packageType === 'CUSTOM' ||
-      pkg.identifier === '$rc_custom' ||
-      pkg.identifier.toLowerCase().includes('pack') ||
-      pkg.identifier.toLowerCase().includes('scan') ||
-      pkg.identifier.includes('5') ||
-      pkg.product?.identifier?.toLowerCase().includes('pack') ||
-      pkg.product?.identifier?.toLowerCase().includes('scan'),
-  );
-
-  const monthlyPrice = monthlyPkg?.product?.priceString || '$4.99';
-  const packPrice = packPkg?.product?.priceString || '$1.99';
+  const fallbackPrices = getLocalizedFallbackPrice();
+  const monthlyPrice =
+    monthlyPkg?.product?.priceString || contextMonthlyPrice || fallbackPrices.monthly;
+  const packPrice =
+    packPkg?.product?.priceString || contextPackPrice || fallbackPrices.pack;
 
   const handlePurchase = async () => {
     if (isPro) {

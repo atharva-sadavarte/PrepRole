@@ -20,7 +20,12 @@ import {supabase} from '../lib/supabase';
 import {useTheme} from '../context/ThemeContext';
 import {COLORS, SPACING, RADIUS, ICON_SIZES, FONTS, SHADOWS} from '../lib/theme';
 import {getUserAnalyses} from '../services/resumeService';
-import {restorePurchases, logoutPurchases} from '../services/purchaseService';
+import {
+  restorePurchases,
+  logoutPurchases,
+  getOfferings,
+  findMonthlyPackage,
+} from '../services/purchaseService';
 import {useQuota} from '../context/QuotaContext';
 import PaywallModal from '../components/PaywallModal';
 import Icon from '../components/Icon';
@@ -48,7 +53,24 @@ const ProfileScreen = ({session}: ProfileScreenProps) => {
     paywallReason,
     openPaywall,
     closePaywall,
+    monthlyPrice,
   } = useQuota();
+  const [displayPrice, setDisplayPrice] = useState<string>(monthlyPrice || '$4.99');
+
+  useEffect(() => {
+    if (monthlyPrice) {
+      setDisplayPrice(monthlyPrice);
+    }
+  }, [monthlyPrice]);
+
+  useEffect(() => {
+    getOfferings().then(pkgs => {
+      const mPkg = findMonthlyPackage(pkgs);
+      if (mPkg?.product?.priceString) {
+        setDisplayPrice(mPkg.product.priceString);
+      }
+    });
+  }, []);
   const [totalScans, setTotalScans] = useState(0);
   const [bestScore, setBestScore] = useState(0);
   const [avgScore, setAvgScore] = useState(0);
@@ -549,7 +571,7 @@ const ProfileScreen = ({session}: ProfileScreenProps) => {
                     style={{marginRight: 6}}
                   />
                   <Text style={styles.upgradeCtaText}>
-                    Upgrade to Pro — $4.99/mo
+                    Upgrade to Pro — {displayPrice}/mo
                   </Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -1296,6 +1318,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   planSectionCard: {
+    marginHorizontal: SPACING.lg,
     borderRadius: RADIUS.lg,
     padding: SPACING.md,
     borderWidth: 1,

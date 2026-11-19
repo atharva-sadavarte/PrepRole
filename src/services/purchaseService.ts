@@ -60,6 +60,98 @@ export async function initPurchases(userId?: string): Promise<void> {
 }
 
 /**
+ * Detects device country/currency for fallback display when RevenueCat offerings
+ * are temporarily unreachable (e.g. pending Google Play Console review).
+ */
+export function getLocalizedFallbackPrice(): {monthly: string; pack: string} {
+  try {
+    const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone || '').toLowerCase();
+    const locale = (new Intl.NumberFormat().resolvedOptions().locale || '').toLowerCase();
+
+    const isIndia =
+      tz.includes('calcutta') ||
+      tz.includes('kolkata') ||
+      tz.includes('asia/calcutta') ||
+      tz.includes('asia/kolkata') ||
+      locale.endsWith('-in') ||
+      locale === 'en-in' ||
+      locale.startsWith('hi');
+
+    if (isIndia) {
+      return {monthly: '₹499', pack: '₹199'};
+    }
+
+    const isUK =
+      tz.includes('london') ||
+      locale.endsWith('-gb') ||
+      locale === 'en-gb';
+
+    if (isUK) {
+      return {monthly: '£4.49', pack: '£1.79'};
+    }
+
+    const isEurozone =
+      tz.includes('berlin') ||
+      tz.includes('paris') ||
+      tz.includes('rome') ||
+      tz.includes('madrid') ||
+      tz.includes('amsterdam') ||
+      tz.includes('vienna') ||
+      tz.includes('brussels');
+
+    if (isEurozone) {
+      return {monthly: '€4.99', pack: '€1.99'};
+    }
+  } catch {
+    // ignore
+  }
+
+  return {monthly: '$4.99', pack: '$1.99'};
+}
+
+/**
+ * Finds the monthly Pro subscription package from available packages.
+ */
+export function findMonthlyPackage(packages: PurchasesPackage[]): PurchasesPackage | undefined {
+  if (!packages || packages.length === 0) return undefined;
+
+  return (
+    packages.find(
+      pkg =>
+        pkg.packageType === 'MONTHLY' ||
+        pkg.identifier === '$rc_monthly' ||
+        pkg.identifier.toLowerCase().includes('monthly') ||
+        pkg.identifier.toLowerCase().includes('pro') ||
+        pkg.product?.identifier?.toLowerCase().includes('monthly') ||
+        pkg.product?.identifier?.toLowerCase().includes('pro'),
+    ) ||
+    packages.find(pkg => pkg.packageType !== 'CUSTOM') ||
+    packages[0]
+  );
+}
+
+/**
+ * Finds the 5-scan credit top-up pack from available packages.
+ */
+export function findScanPackPackage(packages: PurchasesPackage[]): PurchasesPackage | undefined {
+  if (!packages || packages.length === 0) return undefined;
+
+  return (
+    packages.find(
+      pkg =>
+        pkg.packageType === 'CUSTOM' ||
+        pkg.identifier === '$rc_custom' ||
+        pkg.identifier.toLowerCase().includes('pack') ||
+        pkg.identifier.toLowerCase().includes('scan') ||
+        pkg.identifier.includes('5') ||
+        pkg.product?.identifier?.toLowerCase().includes('pack') ||
+        pkg.product?.identifier?.toLowerCase().includes('scan'),
+    ) ||
+    packages.find(pkg => pkg.packageType === 'CUSTOM')
+  );
+}
+
+/**
  * Fetches available offerings from RevenueCat
  */
 export async function getOfferings(): Promise<PurchasesPackage[]> {
@@ -67,6 +159,15 @@ export async function getOfferings(): Promise<PurchasesPackage[]> {
     const offerings = await Purchases.getOfferings();
     if (offerings.current && offerings.current.availablePackages.length !== 0) {
       return offerings.current.availablePackages;
+    }
+    // Fallback: check all offerings if current is not explicitly flagged
+    if (offerings.all) {
+      for (const key of Object.keys(offerings.all)) {
+        const off = offerings.all[key];
+        if (off?.availablePackages && off.availablePackages.length > 0) {
+          return off.availablePackages;
+        }
+      }
     }
     return [];
   } catch (err: any) {
