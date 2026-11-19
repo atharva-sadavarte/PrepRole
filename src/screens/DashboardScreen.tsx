@@ -1,4 +1,4 @@
-import React, {useRef, useEffect, useState} from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -12,24 +12,24 @@ import {
   Alert,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import {useTheme} from '../context/ThemeContext';
-import {COLORS, SPACING, RADIUS, ICON_SIZES, FONTS} from '../lib/theme';
-import {getUserAnalyses} from '../services/resumeService';
-import {ResumeAnalysisRecord} from '../types/resume';
-import {useQuota} from '../context/QuotaContext';
+import { useTheme } from '../context/ThemeContext';
+import { COLORS, SPACING, RADIUS, ICON_SIZES, FONTS } from '../lib/theme';
+import { getUserAnalyses } from '../services/resumeService';
+import { ResumeAnalysisRecord } from '../types/resume';
+import { useQuota } from '../context/QuotaContext';
 import PaywallModal from '../components/PaywallModal';
 import Icon from '../components/Icon';
-import type {Session} from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
 
-const {width} = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 interface DashboardScreenProps {
   session: Session;
   navigation: any;
 }
 
-const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
-  const {colors, isDark} = useTheme();
+const DashboardScreen = ({ session, navigation }: DashboardScreenProps) => {
+  const { colors, isDark } = useTheme();
   const {
     quota,
     isPro,
@@ -117,19 +117,19 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
     if (key === 'analyze') {
       navigation
         .getParent()
-        ?.navigate('AnalyzeTab', {screen: 'CVUploadMain'});
+        ?.navigate('AnalyzeTab', { screen: 'CVUploadMain' });
     } else if (key === 'history') {
       navigation
         .getParent()
-        ?.navigate('HistoryTab', {screen: 'ScoreHistoryMain'});
+        ?.navigate('HistoryTab', { screen: 'ScoreHistoryMain' });
     } else if (key === 'interview') {
-      navigation.navigate('InterviewCoach', {resumeOngoingFromMenu: true});
+      navigation.navigate('InterviewCoach', { resumeOngoingFromMenu: true });
     } else if (key === 'pitch') {
       navigation.navigate('PitchTrainerMain');
     } else {
       navigation
         .getParent()
-        ?.navigate('HistoryTab', {screen: 'ScoreHistoryMain'});
+        ?.navigate('HistoryTab', { screen: 'ScoreHistoryMain' });
     }
   };
 
@@ -171,11 +171,11 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
               <View
                 style={[
                   styles.sparkleIconWrapper,
-                  {backgroundColor: colors.accentSoft},
+                  { backgroundColor: colors.accentSoft },
                 ]}>
                 <Icon name="sparkles" size={12} color={colors.accent} />
               </View>
-              <Text style={[styles.brandPillText, {color: colors.textPrimary}]}>
+              <Text style={[styles.brandPillText, { color: colors.textPrimary }]}>
                 PrepRole AI
               </Text>
               {isPro ? (
@@ -192,12 +192,12 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                     name="diamond"
                     size={10}
                     color={colors.primaryStart}
-                    style={{marginRight: 3}}
+                    style={{ marginRight: 3 }}
                   />
                   <Text
                     style={[
                       styles.activeBadgeText,
-                      {color: colors.primaryStart, fontWeight: '700'},
+                      { color: colors.primaryStart, fontWeight: '700' },
                     ]}>
                     PRO
                   </Text>
@@ -254,7 +254,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                   },
                 ]}>
                 {userAvatar ? (
-                  <Image source={{uri: userAvatar}} style={styles.avatarImage} />
+                  <Image source={{ uri: userAvatar }} style={styles.avatarImage} />
                 ) : (
                   <LinearGradient
                     colors={[colors.primaryStart, colors.primaryEnd]}
@@ -265,7 +265,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                   </LinearGradient>
                 )}
               </View>
-              <View style={[styles.onlineDot, {borderColor: colors.bgDark}]} />
+              <View style={[styles.onlineDot, { borderColor: colors.bgDark }]} />
             </TouchableOpacity>
           </View>
         </View>
@@ -277,27 +277,27 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
           <Animated.View
             style={[
               styles.contentHeader,
-              {opacity: fadeAnim, transform: [{translateY: slideAnim}]},
+              { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
             ]}>
             {/* Editorial Greeting */}
             <View style={styles.greetingWrapper}>
               <View style={styles.greetingSubRow}>
-                <Text style={[styles.greetingLabel, {color: colors.accent}]}>
+                <Text style={[styles.greetingLabel, { color: colors.accent }]}>
                   {getGreeting().toUpperCase()}
                 </Text>
-                <Text style={[styles.dateSeparator, {color: colors.textMuted}]}>
+                <Text style={[styles.dateSeparator, { color: colors.textMuted }]}>
                   •
                 </Text>
-                <Text style={[styles.dateText, {color: colors.textSecondary}]}>
+                <Text style={[styles.dateText, { color: colors.textSecondary }]}>
                   {todayFormatted}
                 </Text>
               </View>
               <Text
-                style={[styles.userNameHeadline, {color: colors.textPrimary}]}
+                style={[styles.userNameHeadline, { color: colors.textPrimary }]}
                 numberOfLines={1}>
                 {userName}
               </Text>
-              <Text style={[styles.headlineSub, {color: colors.textSecondary}]}>
+              <Text style={[styles.headlineSub, { color: colors.textSecondary }]}>
                 Your career readiness & ATS optimization hub
               </Text>
             </View>
@@ -317,14 +317,14 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                 <View
                   style={[
                     styles.metricIconBg,
-                    {backgroundColor: colors.accentSoft},
+                    { backgroundColor: colors.accentSoft },
                   ]}>
                   <Icon name="trophy-outline" size={16} color={colors.accent} />
                 </View>
-                <Text style={[styles.metricValue, {color: colors.textPrimary}]}>
+                <Text style={[styles.metricValue, { color: colors.textPrimary }]}>
                   {bestScore > 0 ? `${bestScore}` : '—'}
                 </Text>
-                <Text style={[styles.metricLabel, {color: colors.textSecondary}]}>
+                <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
                   Best Score
                 </Text>
               </View>
@@ -342,15 +342,15 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                 <View
                   style={[
                     styles.metricIconBg,
-                    {backgroundColor: 'rgba(91, 130, 102, 0.14)'},
+                    { backgroundColor: 'rgba(91, 130, 102, 0.14)' },
                   ]}
                 >
                   <Icon name="document-text-outline" size={16} color="#5B8266" />
                 </View>
-                <Text style={[styles.metricValue, {color: colors.textPrimary}]}>
+                <Text style={[styles.metricValue, { color: colors.textPrimary }]}>
                   {recentScans.length}
                 </Text>
-                <Text style={[styles.metricLabel, {color: colors.textSecondary}]}>
+                <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
                   Scans Done
                 </Text>
               </View>
@@ -368,7 +368,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                           text: 'Subscription Details',
                           onPress: () => openPaywall('pro_info'),
                         },
-                        {text: 'Awesome', style: 'default'},
+                        { text: 'Awesome', style: 'default' },
                       ],
                     );
                   } else {
@@ -410,16 +410,16 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                   {isPro
                     ? 'PRO'
                     : creditsRemaining === 0
-                    ? '0 Left'
-                    : `${creditsRemaining} Left`}
+                      ? '0 Left'
+                      : `${creditsRemaining} Left`}
                 </Text>
                 <Text
-                  style={[styles.metricLabel, {color: colors.textSecondary}]}>
+                  style={[styles.metricLabel, { color: colors.textSecondary }]}>
                   {isPro
                     ? 'Unlimited'
                     : creditsRemaining === 1
-                    ? 'Free Scan'
-                    : 'Free Scans'}
+                      ? 'Free Scan'
+                      : 'Free Scans'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -438,29 +438,29 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                 <View
                   style={[
                     styles.spotlightTag,
-                    {backgroundColor: colors.accentSoft},
+                    { backgroundColor: colors.accentSoft },
                   ]}>
                   <Icon
                     name="flash"
                     size={11}
                     color={colors.accent}
-                    style={{marginRight: 4}}
+                    style={{ marginRight: 4 }}
                   />
-                  <Text style={[styles.spotlightTagText, {color: colors.accent}]}>
+                  <Text style={[styles.spotlightTagText, { color: colors.accent }]}>
                     AI CV OPTIMIZER
                   </Text>
                 </View>
-                <Text style={[styles.spotlightVersion, {color: colors.textMuted}]}>
+                <Text style={[styles.spotlightVersion, { color: colors.textMuted }]}>
                   ATS v2.4
                 </Text>
               </View>
 
               <Text
-                style={[styles.spotlightTitle, {color: colors.textPrimary}]}>
+                style={[styles.spotlightTitle, { color: colors.textPrimary }]}>
                 Benchmark Your Resume Against ATS Standards
               </Text>
               <Text
-                style={[styles.spotlightDesc, {color: colors.textSecondary}]}>
+                style={[styles.spotlightDesc, { color: colors.textSecondary }]}>
                 Get instant 5-pillar scoring, keyword gap diagnostics, and
                 personalized bullet rewrites to beat the filter.
               </Text>
@@ -470,7 +470,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                 <TouchableOpacity
                   style={[
                     styles.primaryCtaBtn,
-                    {backgroundColor: colors.primaryStart},
+                    { backgroundColor: colors.primaryStart },
                   ]}
                   activeOpacity={0.85}
                   onPress={() => handleActionPress('analyze')}>
@@ -481,7 +481,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                     name="arrow-forward"
                     size={14}
                     color="#FFFFFF"
-                    style={{marginLeft: 6}}
+                    style={{ marginLeft: 6 }}
                   />
                 </TouchableOpacity>
 
@@ -499,12 +499,12 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                     name="time-outline"
                     size={14}
                     color={colors.textSecondary}
-                    style={{marginRight: 5}}
+                    style={{ marginRight: 5 }}
                   />
                   <Text
                     style={[
                       styles.secondaryCtaText,
-                      {color: colors.textSecondary},
+                      { color: colors.textSecondary },
                     ]}
                     numberOfLines={1}>
                     History
@@ -537,11 +537,11 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                     style={styles.upgradeBannerIcon}>
                     <Icon name="diamond" size={16} color="#FFFFFF" />
                   </LinearGradient>
-                  <View style={{flex: 1, marginLeft: SPACING.sm}}>
+                  <View style={{ flex: 1, marginLeft: SPACING.sm }}>
                     <Text
                       style={[
                         styles.upgradeBannerTitle,
-                        {color: colors.textPrimary},
+                        { color: colors.textPrimary },
                       ]}>
                       {creditsRemaining === 0
                         ? 'Free scans limit reached'
@@ -550,7 +550,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                     <Text
                       style={[
                         styles.upgradeBannerSubtitle,
-                        {color: colors.textSecondary},
+                        { color: colors.textSecondary },
                       ]}>
                       Upgrade to Pro for unlimited resume evaluations & AI coaching.
                     </Text>
@@ -559,7 +559,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                 <View
                   style={[
                     styles.upgradeBannerBtn,
-                    {backgroundColor: colors.primaryStart},
+                    { backgroundColor: colors.primaryStart },
                   ]}>
                   <Text style={styles.upgradeBannerBtnText}>Upgrade</Text>
                 </View>
@@ -587,7 +587,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                 <Text
                   style={[
                     styles.proStatusStripText,
-                    {color: colors.primaryStart},
+                    { color: colors.primaryStart },
                   ]}>
                   PrepRole Pro Member • Unlimited ATS Scans Active
                 </Text>
@@ -598,10 +598,10 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
           {/* Tools & Accelerators Section */}
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
-              <Text style={[styles.sectionHeading, {color: colors.textPrimary}]}>
+              <Text style={[styles.sectionHeading, { color: colors.textPrimary }]}>
                 Career Tools
               </Text>
-              <Text style={[styles.sectionSubheading, {color: colors.textSecondary}]}>
+              <Text style={[styles.sectionSubheading, { color: colors.textSecondary }]}>
                 AI-assisted resume & interview preparation suite
               </Text>
             </View>
@@ -633,8 +633,8 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                 <LinearGradient
                   colors={[colors.accent, colors.primaryEnd]}
                   style={styles.featuredIconBg}
-                  start={{x: 0, y: 0}}
-                  end={{x: 1, y: 1}}>
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}>
                   <Icon name="document-text" size={22} color="#FFFFFF" />
                 </LinearGradient>
                 <View style={styles.featuredCardContent}>
@@ -642,17 +642,17 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                     <Text
                       style={[
                         styles.featuredCardTitle,
-                        {color: colors.textPrimary},
+                        { color: colors.textPrimary },
                       ]}>
                       Scan & Score CV
                     </Text>
                     <View
                       style={[
                         styles.miniBadge,
-                        {backgroundColor: colors.accentSoft},
+                        { backgroundColor: colors.accentSoft },
                       ]}>
                       <Text
-                        style={[styles.miniBadgeText, {color: colors.accent}]}>
+                        style={[styles.miniBadgeText, { color: colors.accent }]}>
                         Popular
                       </Text>
                     </View>
@@ -660,7 +660,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                   <Text
                     style={[
                       styles.featuredCardDesc,
-                      {color: colors.textSecondary},
+                      { color: colors.textSecondary },
                     ]}>
                     Analyze resume against specific job descriptions for match rate
                   </Text>
@@ -674,9 +674,9 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
             </Animated.View>
 
 
-            {/* Companion Row: Interview Coach & Personal Pitch Trainer */}
+            {/* Temporarily hidden: Interview Coach & Personal Pitch Trainer buttons
             <View style={styles.splitRow}>
-              {/* Interview Coach */}
+              // Interview Coach
               <Animated.View
                 style={[
                   styles.splitCol,
@@ -727,7 +727,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                 </TouchableOpacity>
               </Animated.View>
 
-              {/* Personal Pitch Trainer */}
+              // Personal Pitch Trainer
               <Animated.View
                 style={[
                   styles.splitCol,
@@ -778,6 +778,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                 </TouchableOpacity>
               </Animated.View>
             </View>
+            */}
 
             {/* Learning Card */}
             <Animated.View
@@ -806,22 +807,22 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                 <LinearGradient
                   colors={['#C27322', '#A35D16']}
                   style={styles.compactIconBg}
-                  start={{x: 0, y: 0}}
-                  end={{x: 1, y: 1}}>
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}>
                   <Icon name="school" size={18} color="#FFFFFF" />
                 </LinearGradient>
-                <View style={{flex: 1, marginLeft: SPACING.md}}>
+                <View style={{ flex: 1, marginLeft: SPACING.md }}>
                   <Text
                     style={[
                       styles.compactCardTitle,
-                      {color: colors.textPrimary},
+                      { color: colors.textPrimary },
                     ]}>
                     Skill Growth & Playbook
                   </Text>
                   <Text
                     style={[
                       styles.compactCardDesc,
-                      {color: colors.textSecondary},
+                      { color: colors.textSecondary },
                     ]}>
                     Actionable strategies to boost your resume callbacks
                   </Text>
@@ -840,13 +841,13 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
             <View style={styles.activityHeaderRow}>
               <View>
                 <Text
-                  style={[styles.sectionHeading, {color: colors.textPrimary}]}>
+                  style={[styles.sectionHeading, { color: colors.textPrimary }]}>
                   Recent Activity
                 </Text>
                 <Text
                   style={[
                     styles.sectionSubheading,
-                    {color: colors.textSecondary},
+                    { color: colors.textSecondary },
                   ]}>
                   Your latest resume evaluations
                 </Text>
@@ -856,7 +857,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                   onPress={() => handleActionPress('history')}
                   style={styles.seeAllBtn}>
                   <Text
-                    style={[styles.seeAllText, {color: colors.accent}]}>
+                    style={[styles.seeAllText, { color: colors.accent }]}>
                     View All
                   </Text>
                   <Icon
@@ -882,7 +883,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                   ]}
                   activeOpacity={0.8}
                   onPress={() =>
-                    navigation.navigate('CVScoreResult', {analysis: scan})
+                    navigation.navigate('CVScoreResult', { analysis: scan })
                   }>
                   <View
                     style={[
@@ -895,7 +896,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                     <Text
                       style={[
                         styles.activityScoreText,
-                        {color: colors.accent},
+                        { color: colors.accent },
                       ]}>
                       {scan.overall_score}
                     </Text>
@@ -904,7 +905,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                     <Text
                       style={[
                         styles.activityTitle,
-                        {color: colors.textPrimary},
+                        { color: colors.textPrimary },
                       ]}
                       numberOfLines={1}>
                       {scan.target_role}
@@ -912,7 +913,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                     <Text
                       style={[
                         styles.activityDesc,
-                        {color: colors.textSecondary},
+                        { color: colors.textSecondary },
                       ]}
                       numberOfLines={1}>
                       {scan.summary || 'Resume analyzed successfully'}
@@ -922,7 +923,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                     <Text
                       style={[
                         styles.activityTime,
-                        {color: colors.textMuted},
+                        { color: colors.textMuted },
                       ]}>
                       {formatDate(scan.created_at)}
                     </Text>
@@ -949,7 +950,7 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                 <View
                   style={[
                     styles.emptyIconCircle,
-                    {backgroundColor: colors.accentSoft},
+                    { backgroundColor: colors.accentSoft },
                   ]}>
                   <Icon
                     name="document-text-outline"
@@ -957,18 +958,18 @@ const DashboardScreen = ({session, navigation}: DashboardScreenProps) => {
                     color={colors.accent}
                   />
                 </View>
-                <View style={{flex: 1, marginLeft: SPACING.md}}>
+                <View style={{ flex: 1, marginLeft: SPACING.md }}>
                   <Text
                     style={[
                       styles.emptyCardTitle,
-                      {color: colors.textPrimary},
+                      { color: colors.textPrimary },
                     ]}>
                     No CV Scans Yet
                   </Text>
                   <Text
                     style={[
                       styles.emptyCardDesc,
-                      {color: colors.textSecondary},
+                      { color: colors.textSecondary },
                     ]}>
                     Scan your resume to view your ATS score timeline
                   </Text>
@@ -1031,7 +1032,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
     borderWidth: 1,
     elevation: 2,
-    shadowOffset: {width: 0, height: 1},
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 3,
   },
@@ -1071,7 +1072,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
     elevation: 3,
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
@@ -1145,7 +1146,7 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     borderWidth: 1,
     elevation: 2,
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
   },
@@ -1172,7 +1173,7 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     borderWidth: 1,
     elevation: 3,
-    shadowOffset: {width: 0, height: 4},
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
   },
@@ -1270,7 +1271,7 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     borderWidth: 1,
     elevation: 2,
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     marginBottom: SPACING.sm,
@@ -1325,7 +1326,7 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     borderWidth: 1,
     elevation: 2,
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
   },
@@ -1353,7 +1354,7 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     borderWidth: 1,
     elevation: 2,
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
   },
@@ -1381,7 +1382,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: SPACING.sm,
     elevation: 2,
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
   },
@@ -1426,7 +1427,7 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     borderWidth: 1,
     elevation: 2,
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
   },
