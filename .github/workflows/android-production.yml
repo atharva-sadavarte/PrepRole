@@ -181,7 +181,6 @@ jobs:
           releaseFiles: release-artifacts/app-release.aab
           tracks: internal
           status: completed
-          changesNotSentForReview: true
 
       - name: Internal Testing Summary
         run: |
@@ -223,7 +222,6 @@ jobs:
           releaseFiles: release-artifacts/app-release.aab
           tracks: alpha
           status: completed
-          changesNotSentForReview: true
 
       - name: Closed Testing Summary
         run: |

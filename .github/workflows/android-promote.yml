@@ -102,7 +102,6 @@ jobs:
           releaseFiles: release-final/app-release.aab
           tracks: alpha
           status: completed
-          changesNotSentForReview: true
 
       - name: Summary
         run: |
