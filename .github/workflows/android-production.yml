@@ -1,29 +1,65 @@
-name: PrepRole Android Production Release
+name: PrepRole Android Release Pipeline
 
 on:
   push:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      target_track:
+        description: "Target track to release to"
+        required: true
+        default: "internal"
+        type: choice
+        options:
+          - "internal"
+          - "closed"
+          - "production"
+          - "full-pipeline"
+      production_rollout:
+        description: "Production staged rollout fraction (e.g. 0.1 for 10%, 1.0 for 100%)"
+        required: false
+        default: "0.1"
+        type: string
+      override_version_name:
+        description: "Optional version name override (e.g. 1.2.0)"
+        required: false
+        type: string
+      override_version_code:
+        description: "Optional version code override"
+        required: false
+        type: string
 
 permissions:
-  contents: read
+  contents: write
+  actions: read
 
 concurrency:
-  group: preprole-production-release
+  group: preprole-release-pipeline
   cancel-in-progress: false
 
 jobs:
-  build-and-publish:
-    name: Build AAB and Publish
+  # =========================================================================
+  # STAGE 1: Automatic Build & Test
+  # =========================================================================
+  build:
+    name: Build Signed AAB & Run Tests
     runs-on: ubuntu-latest
+    outputs:
+      version_code: ${{ steps.version.outputs.version_code }}
+      version_name: ${{ steps.version.outputs.version_name }}
+      prev_version_code: ${{ steps.version.outputs.prev_version_code }}
+      prev_version_name: ${{ steps.version.outputs.prev_version_name }}
+      artifact_name: PrepRole-Release-${{ steps.version.outputs.version_name }}-b${{ steps.version.outputs.version_code }}
 
     steps:
-      # 1. Checkout latest code
+      # 1. Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      # 2. Setup Node (matches engines requirement >= 22.11.0)
+      # 2. Setup Node.js 22 (matches engines requirement >= 22.11.0)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -42,7 +78,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 5. Decode existing keystore from secret
+      # 5. Run automated tests (fail early if tests fail)
+      - name: Run Jest tests
+        run: npm test
+
+      # 6. Auto-calculate incremented Version Code and Version Name
+      - name: Calculate incremented version
+        id: version
+        env:
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          OVERRIDE_VERSION_CODE: ${{ inputs.override_version_code }}
+          OVERRIDE_VERSION_NAME: ${{ inputs.override_version_name }}
+        run: |
+          node scripts/calculate-version.js --update-files
+
+      # 7. Decode existing keystore from secret
       - name: Configure Android signing
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -65,34 +115,161 @@ jobs:
             echo "MYAPP_UPLOAD_KEY_PASSWORD=$KEY_PASSWORD"
           } >> "$HOME/.gradle/gradle.properties"
 
-      # 6. Build signed AAB
+      # 8. Build signed release AAB with auto-incremented version
       - name: Generate Release AAB
         working-directory: android
+        env:
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
         run: |
           chmod +x gradlew
-          ./gradlew bundleRelease --no-daemon
+          ./gradlew bundleRelease \
+            -PVERSION_CODE="${VERSION_CODE}" \
+            -PVERSION_NAME="${VERSION_NAME}" \
+            --no-daemon
 
-      # 7. Verify generated AAB
-      - name: Verify AAB
+      # 9. Verify generated AAB exists
+      - name: Verify AAB output
         run: |
           test -f android/app/build/outputs/bundle/release/app-release.aab
           ls -lh android/app/build/outputs/bundle/release/app-release.aab
 
-      # 8. Save AAB as GitHub artifact
+      # 10. Save AAB as GitHub artifact (Release Candidate)
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PrepRole-Android-Release
+          name: PrepRole-Release-${{ steps.version.outputs.version_name }}-b${{ steps.version.outputs.version_code }}
           path: android/app/build/outputs/bundle/release/app-release.aab
-          retention-days: 7
+          retention-days: 30
 
-      # 9. Publish to Google Play Production (10% staged rollout)
-      - name: Publish to Google Play
+      # 11. Add Step Summary
+      - name: Build Summary
+        run: |
+          echo "### 🚀 Android Build Completed Successfully" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Previous | New (This Build) |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Version Code** | \`${{ steps.version.outputs.prev_version_code }}\` | **\`${{ steps.version.outputs.version_code }}\`** ⬆️ |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Version Name** | \`${{ steps.version.outputs.prev_version_name }}\` | **\`${{ steps.version.outputs.version_name }}\`** ⬆️ |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tests:** Passed (Jest)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifact:** \`PrepRole-Release-${{ steps.version.outputs.version_name }}-b${{ steps.version.outputs.version_code }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # =========================================================================
+  # STAGE 2: Internal Testing (Automatic on push to main)
+  # =========================================================================
+  internal-testing:
+    name: Internal Testing (Automatic on push)
+    runs-on: ubuntu-latest
+    needs: build
+    # Runs automatically on every push to main, or if internal/full-pipeline is selected
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && (inputs.target_track == 'internal' || inputs.target_track == 'full-pipeline'))
+
+    steps:
+      - name: Download AAB artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: release-artifacts
+
+      - name: Publish to Google Play (Internal Testing)
         uses: r0adkll/upload-google-play@v1.1.4
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.preprole
-          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
+          releaseFiles: release-artifacts/app-release.aab
+          track: internal
+          status: completed
+
+      - name: Internal Testing Summary
+        run: |
+          echo "### 📱 Internal Testing: Published Automatically" >> $GITHUB_STEP_SUMMARY
+          echo "- **Track:** \`internal\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version Name:** \`${{ needs.build.outputs.version_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version Code:** \`${{ needs.build.outputs.version_code }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** Completed" >> $GITHUB_STEP_SUMMARY
+          echo "- **Next Step:** Awaiting QA review before promoting to Closed Testing." >> $GITHUB_STEP_SUMMARY
+
+  # =========================================================================
+  # STAGE 3: Closed Testing (Controlled Release / QA Approval)
+  # =========================================================================
+  closed-testing:
+    name: Closed Testing (Controlled Release / QA Approval)
+    runs-on: ubuntu-latest
+    needs: [build, internal-testing]
+    environment:
+      name: closed-testing
+    # Only triggered on manual dispatch after QA approval
+    if: |
+      always() &&
+      needs.build.result == 'success' &&
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.target_track == 'closed' || inputs.target_track == 'full-pipeline')
+
+    steps:
+      - name: Download AAB artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: release-artifacts
+
+      - name: Publish to Google Play (Closed Testing)
+        uses: r0adkll/upload-google-play@v1.1.4
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.preprole
+          releaseFiles: release-artifacts/app-release.aab
+          track: alpha
+          status: completed
+
+      - name: Closed Testing Summary
+        run: |
+          echo "### 🛡️ Closed Testing: QA Approved Release Candidate" >> $GITHUB_STEP_SUMMARY
+          echo "- **Track:** \`alpha\` (Closed Testing)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version Name:** \`${{ needs.build.outputs.version_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version Code:** \`${{ needs.build.outputs.version_code }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** Completed" >> $GITHUB_STEP_SUMMARY
+          echo "- **Next Step:** Beta verification before final Production approval." >> $GITHUB_STEP_SUMMARY
+
+  # =========================================================================
+  # STAGE 4: Production (Final Manual Approval / Real Users)
+  # =========================================================================
+  production:
+    name: Production (Final Approval / Real Users)
+    runs-on: ubuntu-latest
+    needs: [build, closed-testing]
+    environment:
+      name: production
+    # Only triggered on manual dispatch for final production release
+    if: |
+      always() &&
+      needs.build.result == 'success' &&
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.target_track == 'production' || inputs.target_track == 'full-pipeline')
+
+    steps:
+      - name: Download AAB artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: release-artifacts
+
+      - name: Publish to Google Play (Production)
+        uses: r0adkll/upload-google-play@v1.1.4
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.preprole
+          releaseFiles: release-artifacts/app-release.aab
           track: production
           status: inProgress
-          userFraction: 0.1
+          userFraction: ${{ inputs.production_rollout || '0.1' }}
+
+      - name: Production Release Summary
+        run: |
+          echo "### 🌟 Production: Published to Real Users" >> $GITHUB_STEP_SUMMARY
+          echo "- **Track:** \`production\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version Name:** \`${{ needs.build.outputs.version_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version Code:** \`${{ needs.build.outputs.version_code }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** In Progress (Staged Rollout: ${{ inputs.production_rollout || '0.1' }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Sign-off:** Validated and approved release candidate published to live users." >> $GITHUB_STEP_SUMMARY

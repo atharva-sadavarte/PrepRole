@@ -75,6 +75,32 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+def getAppVersionCode() {
+    if (project.hasProperty('VERSION_CODE')) {
+        return project.property('VERSION_CODE').toInteger()
+    }
+    if (project.hasProperty('versionCode')) {
+        return project.property('versionCode').toInteger()
+    }
+    if (System.getenv('VERSION_CODE')) {
+        return System.getenv('VERSION_CODE').toInteger()
+    }
+    return 4
+}
+
+def getAppVersionName() {
+    if (project.hasProperty('VERSION_NAME')) {
+        return project.property('VERSION_NAME').toString()
+    }
+    if (project.hasProperty('versionName')) {
+        return project.property('versionName').toString()
+    }
+    if (System.getenv('VERSION_NAME')) {
+        return System.getenv('VERSION_NAME').toString()
+    }
+    return "1.1.0"
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -85,8 +111,8 @@ android {
         applicationId "com.preprole"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 4
-        versionName "1.1.0"
+        versionCode getAppVersionCode()
+        versionName getAppVersionName()
     }
     signingConfigs {
         debug {

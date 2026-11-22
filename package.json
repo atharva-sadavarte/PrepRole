@@ -1,10 +1,11 @@
 {
   "name": "com.preprole",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "packageManager": "npm@10.9.3",
   "scripts": {
     "android": "react-native run-android",
+    "calculate-version": "node scripts/calculate-version.js",
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
