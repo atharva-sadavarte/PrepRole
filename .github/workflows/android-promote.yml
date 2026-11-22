@@ -4,21 +4,21 @@ on:
   workflow_dispatch:
     inputs:
       target_track:
-        description: 'Target track to promote Release Candidate to'
+        description: "Target track to promote Release Candidate to"
         required: true
-        default: 'closed'
+        default: "closed"
         type: choice
         options:
-          - 'closed'
-          - 'production'
+          - "closed"
+          - "production"
       run_id:
-        description: 'Workflow Run ID of the build to promote (leave blank for latest build on main)'
+        description: "Workflow Run ID of the build to promote (leave blank for latest build on main)"
         required: false
         type: string
       production_rollout:
-        description: 'Production rollout fraction if promoting to production (e.g. 0.1 for 10%, 1.0 for 100%)'
+        description: "Production rollout fraction if promoting to production (e.g. 0.1 for 10%, 1.0 for 100%)"
         required: false
-        default: '0.1'
+        default: "0.1"
         type: string
 
 permissions:
@@ -100,8 +100,9 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.preprole
           releaseFiles: release-final/app-release.aab
-          track: alpha
+          tracks: alpha
           status: completed
+          changesNotSentForReview: true
 
       - name: Summary
         run: |
@@ -184,7 +185,7 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.preprole
           releaseFiles: release-final/app-release.aab
-          track: production
+          tracks: production
           status: inProgress
           userFraction: ${{ inputs.production_rollout || '0.1' }}
 

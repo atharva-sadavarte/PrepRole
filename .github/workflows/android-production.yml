@@ -179,8 +179,9 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.preprole
           releaseFiles: release-artifacts/app-release.aab
-          track: internal
+          tracks: internal
           status: completed
+          changesNotSentForReview: true
 
       - name: Internal Testing Summary
         run: |
@@ -220,8 +221,9 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.preprole
           releaseFiles: release-artifacts/app-release.aab
-          track: alpha
+          tracks: alpha
           status: completed
+          changesNotSentForReview: true
 
       - name: Closed Testing Summary
         run: |
@@ -261,7 +263,7 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.preprole
           releaseFiles: release-artifacts/app-release.aab
-          track: production
+          tracks: production
           status: inProgress
           userFraction: ${{ inputs.production_rollout || '0.1' }}
 
