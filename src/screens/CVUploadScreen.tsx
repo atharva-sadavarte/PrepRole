@@ -22,6 +22,7 @@ import {
   saveAnalysis,
   uploadResumeFile,
   openResumeInViewer,
+  cacheOriginalLocalPdfUri,
 } from '../services/resumeService';
 import {getPdfBase64} from '../services/pdfService';
 import Icon from '../components/Icon';
@@ -285,6 +286,20 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
         uploadedFilePath,
       );
 
+      // Persist local copy of uploaded PDF for instant inline editing
+      let cachedLocalPdfUri: string | null = null;
+      if (
+        selectedFile?.uri &&
+        (selectedFile.name?.toLowerCase().endsWith('.pdf') ||
+          selectedFile.type?.toLowerCase().includes('pdf'))
+      ) {
+        cachedLocalPdfUri = await cacheOriginalLocalPdfUri(
+          savedRecord.id,
+          selectedFile.uri,
+          selectedFile.name || 'Resume.pdf',
+        );
+      }
+
       setLoading(false);
 
       // Reset the Analyze screen for next upload/scan
@@ -293,6 +308,7 @@ export const CVUploadScreen: React.FC<CVUploadScreenProps> = ({
       // Navigate to result screen with the analysis
       navigation.navigate('CVScoreResult', {
         analysis: savedRecord,
+        localPdfUri: cachedLocalPdfUri || undefined,
       });
     } catch (error: any) {
       setLoading(false);

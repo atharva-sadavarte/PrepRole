@@ -15,33 +15,48 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useTheme} from '../context/ThemeContext';
-import {COLORS, SPACING, RADIUS, ICON_SIZES, FONTS, SHADOWS} from '../lib/theme';
+import {SPACING, RADIUS, FONTS, SHADOWS} from '../lib/theme';
 import Icon from './Icon';
-import {renderPdfPages, openSystemPdfViewer, PdfPreviewResult} from '../services/pdfService';
+import {
+  renderPdfPages,
+  openSystemPdfViewer,
+  PdfPreviewResult,
+} from '../services/pdfService';
 
-const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
+const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
 interface PdfPreviewModalProps {
   visible: boolean;
   fileUri: string | null;
+  compareOriginalUri?: string | null;
   fileName?: string;
   fileSize?: number;
   onClose: () => void;
   onReplaceFile?: () => void;
   onConfirmFile?: () => void;
+  onDownload?: (activeUri: string) => void;
+  onShare?: (activeUri: string) => void;
+  confirmLabel?: string;
 }
 
 export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
   visible,
   fileUri,
+  compareOriginalUri,
   fileName = 'Resume Document',
   fileSize,
   onClose,
   onReplaceFile,
   onConfirmFile,
+  onDownload,
+  onShare,
+  confirmLabel = 'Looks Good',
 }) => {
   const insets = useSafeAreaInsets();
   const {colors, isDark} = useTheme();
+  const [activeVersion, setActiveVersion] = useState<'updated' | 'original'>(
+    'updated',
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pages, setPages] = useState<string[]>([]);
@@ -50,6 +65,18 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
   const [totalPageCount, setTotalPageCount] = useState(1);
   const [zoomLevel, setZoomLevel] = useState(1);
   const lastTapRef = useRef<number>(0);
+
+  const hasComparison = !!(compareOriginalUri && fileUri);
+  const activeUri =
+    hasComparison && activeVersion === 'original'
+      ? compareOriginalUri
+      : fileUri;
+
+  useEffect(() => {
+    if (visible) {
+      setActiveVersion('updated');
+    }
+  }, [visible]);
 
   const handleZoomIn = () => {
     setZoomLevel(prev => Math.min(2.5, +(prev + 0.25).toFixed(2)));
@@ -81,7 +108,7 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
   };
 
   useEffect(() => {
-    if (!visible || !fileUri) {
+    if (!visible || !activeUri) {
       setPages([]);
       setError(null);
       setLoading(true);
@@ -101,7 +128,7 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
       setLoading(true);
       setError(null);
       try {
-        const result: PdfPreviewResult = await renderPdfPages(fileUri, 6);
+        const result: PdfPreviewResult = await renderPdfPages(activeUri, 6);
         if (isMounted) {
           if (result.pageUris && result.pageUris.length > 0) {
             setPages(result.pageUris);
@@ -129,11 +156,11 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [visible, fileUri, fadeAnim]);
+  }, [visible, activeUri, fadeAnim]);
 
   const handleOpenExternal = async () => {
-    if (!fileUri) return;
-    await openSystemPdfViewer(fileUri);
+    if (!activeUri) return;
+    await openSystemPdfViewer(activeUri);
   };
 
   if (!visible) return null;
@@ -195,6 +222,23 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
           </View>
 
           <View style={styles.headerRight}>
+            {onShare && activeUri ? (
+              <TouchableOpacity
+                onPress={() => onShare(activeUri)}
+                style={[
+                  styles.iconBtn,
+                  {backgroundColor: colors.bgCard, borderColor: colors.border},
+                ]}
+                activeOpacity={0.7}
+                accessibilityLabel="Share PDF">
+                <Icon
+                  name="share-social-outline"
+                  size={16}
+                  color={colors.textPrimary}
+                />
+              </TouchableOpacity>
+            ) : null}
+
             <TouchableOpacity
               onPress={handleOpenExternal}
               style={[
@@ -218,6 +262,101 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Updated vs Original Comparison Switcher */}
+        {hasComparison && (
+          <View
+            style={[
+              styles.compareBar,
+              {
+                backgroundColor: colors.bgDark,
+                borderBottomColor: colors.border,
+              },
+            ]}>
+            <View
+              style={[
+                styles.compareSegmented,
+                {
+                  backgroundColor: colors.bgCardLight,
+                  borderColor: colors.border,
+                },
+              ]}>
+              <TouchableOpacity
+                onPress={() => setActiveVersion('updated')}
+                activeOpacity={0.8}
+                style={[
+                  styles.compareTab,
+                  activeVersion === 'updated' && [
+                    styles.compareTabActive,
+                    {
+                      backgroundColor: colors.bgCard,
+                      borderColor: colors.accent,
+                    },
+                  ],
+                ]}>
+                <Icon
+                  name="sparkles"
+                  size={13}
+                  color={
+                    activeVersion === 'updated'
+                      ? colors.accent
+                      : colors.textSecondary
+                  }
+                  style={{marginRight: 5}}
+                />
+                <Text
+                  style={[
+                    styles.compareTabText,
+                    {
+                      color:
+                        activeVersion === 'updated'
+                          ? colors.accent
+                          : colors.textSecondary,
+                    },
+                  ]}>
+                  Updated PDF
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setActiveVersion('original')}
+                activeOpacity={0.8}
+                style={[
+                  styles.compareTab,
+                  activeVersion === 'original' && [
+                    styles.compareTabActive,
+                    {
+                      backgroundColor: colors.bgCard,
+                      borderColor: colors.border,
+                    },
+                  ],
+                ]}>
+                <Icon
+                  name="document-outline"
+                  size={13}
+                  color={
+                    activeVersion === 'original'
+                      ? colors.textPrimary
+                      : colors.textSecondary
+                  }
+                  style={{marginRight: 5}}
+                />
+                <Text
+                  style={[
+                    styles.compareTabText,
+                    {
+                      color:
+                        activeVersion === 'original'
+                          ? colors.textPrimary
+                          : colors.textSecondary,
+                    },
+                  ]}>
+                  Original PDF
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* Main Preview Container */}
         <View style={styles.previewContainer}>
@@ -261,7 +400,11 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
                         : 'rgba(220, 38, 38, 0.08)',
                     },
                   ]}>
-                  <Icon name="alert-circle-outline" size={32} color={colors.error} />
+                  <Icon
+                    name="alert-circle-outline"
+                    size={32}
+                    color={colors.error}
+                  />
                 </View>
                 <Text style={[styles.errorTitle, {color: colors.textPrimary}]}>
                   Preview Unavailable
@@ -270,7 +413,10 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
                   {error}
                 </Text>
                 <TouchableOpacity
-                  style={[styles.systemViewerBtn, {backgroundColor: colors.accent}]}
+                  style={[
+                    styles.systemViewerBtn,
+                    {backgroundColor: colors.accent},
+                  ]}
                   onPress={handleOpenExternal}
                   activeOpacity={0.8}>
                   <Icon
@@ -297,12 +443,17 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
                 style={styles.scrollArea}
                 contentContainerStyle={[
                   styles.scrollContent,
-                  {minWidth: Math.max(SCREEN_WIDTH, scaledWidth + SPACING.lg * 2)},
+                  {
+                    minWidth: Math.max(
+                      SCREEN_WIDTH,
+                      scaledWidth + SPACING.lg * 2,
+                    ),
+                  },
                 ]}
                 showsVerticalScrollIndicator={true}>
                 {pages.map((pageUri, index) => {
                   const pWidth = pageWidths[index] || 1;
-                  const pHeight = pageHeights[index] || 1.414; // Default A4 ratio
+                  const pHeight = pageHeights[index] || 1.414;
                   const pageAspect = pHeight / pWidth;
                   const displayHeight = scaledWidth * pageAspect;
 
@@ -455,13 +606,37 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
             </TouchableOpacity>
           )}
 
+          {onDownload && activeUri && (
+            <TouchableOpacity
+              style={[
+                styles.secondaryBtn,
+                {
+                  backgroundColor: colors.bgCard,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={() => onDownload(activeUri)}
+              activeOpacity={0.8}>
+              <Icon
+                name="download-outline"
+                size={16}
+                color={colors.textPrimary}
+                style={{marginRight: 6}}
+              />
+              <Text
+                style={[styles.secondaryBtnText, {color: colors.textPrimary}]}>
+                Save PDF
+              </Text>
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
             style={[
               styles.primaryBtn,
               {
                 backgroundColor: colors.accent,
-                flex: onReplaceFile ? 1 : undefined,
-                minWidth: onReplaceFile ? undefined : 180,
+                flex: onReplaceFile || onDownload ? 1 : undefined,
+                minWidth: onReplaceFile || onDownload ? undefined : 180,
               },
             ]}
             onPress={() => {
@@ -482,7 +657,7 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({
                 styles.primaryBtnText,
                 {color: isDark ? '#121110' : '#FFFFFF'},
               ]}>
-              Looks Good
+              {confirmLabel}
             </Text>
           </TouchableOpacity>
         </View>
@@ -544,6 +719,35 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  compareBar: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+  },
+  compareSegmented: {
+    flexDirection: 'row',
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    padding: 3,
+    gap: 4,
+  },
+  compareTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 7,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  compareTabActive: {
+    borderWidth: 1,
+  },
+  compareTabText: {
+    fontFamily: FONTS.bold,
+    fontSize: 12,
   },
   previewContainer: {
     flex: 1,

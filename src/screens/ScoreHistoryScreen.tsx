@@ -172,6 +172,26 @@ export const ScoreHistoryScreen: React.FC<ScoreHistoryScreenProps> = ({
                 {item.breakdown?.skills || 0}%
               </Text>
             </View>
+            {item.updated_file_url ? (
+              <View
+                style={[
+                  styles.updatedBadgePill,
+                  {
+                    backgroundColor: colors.accentSoft,
+                    borderColor: colors.border,
+                  },
+                ]}>
+                <Icon
+                  name="sparkles"
+                  size={10}
+                  color={colors.accent}
+                  style={{marginRight: 3}}
+                />
+                <Text style={[styles.updatedBadgeText, {color: colors.accent}]}>
+                  Edited PDF
+                </Text>
+              </View>
+            ) : null}
           </View>
           <View style={styles.cardActionsRow}>
             {item.file_url ? (
@@ -561,6 +581,18 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.medium,
     fontSize: 11,
     color: COLORS.textMuted,
+  },
+  updatedBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+  },
+  updatedBadgeText: {
+    fontFamily: FONTS.bold,
+    fontSize: 10,
   },
   cardActionsRow: {
     flexDirection: 'row',

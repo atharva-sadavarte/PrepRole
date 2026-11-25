@@ -36,7 +36,11 @@ import PitchTrainerFeedbackScreen from '../screens/pitchTrainer/PitchTrainerFeed
 // --- Stack Param Lists ---
 export type HomeStackParamList = {
   DashboardMain: undefined;
-  CVScoreResult: {analysis: ResumeAnalysisRecord};
+  CVScoreResult: {
+    analysis: ResumeAnalysisRecord;
+    localPdfUri?: string;
+    previousScore?: number;
+  };
   InterviewSetup: undefined;
   InterviewRecording: {
     experienceLevel: ExperienceLevel;
@@ -74,7 +78,11 @@ export type HomeStackParamList = {
 
 export type AnalyzeStackParamList = {
   CVUploadMain: undefined;
-  CVScoreResult: {analysis: ResumeAnalysisRecord};
+  CVScoreResult: {
+    analysis: ResumeAnalysisRecord;
+    localPdfUri?: string;
+    previousScore?: number;
+  };
   InterviewSetup: undefined;
   InterviewRecording: {
     experienceLevel: ExperienceLevel;
@@ -112,7 +120,11 @@ export type AnalyzeStackParamList = {
 
 export type HistoryStackParamList = {
   ScoreHistoryMain: undefined;
-  CVScoreResult: {analysis: ResumeAnalysisRecord};
+  CVScoreResult: {
+    analysis: ResumeAnalysisRecord;
+    localPdfUri?: string;
+    previousScore?: number;
+  };
 };
 
 export type ProfileStackParamList = {
@@ -141,6 +153,11 @@ const DashboardScreenWrapper = (props: any) => {
 const CVUploadScreenWrapper = (props: any) => {
   const session = useSession();
   return <CVUploadScreen {...props} session={session!} />;
+};
+
+const CVScoreResultScreenWrapper = (props: any) => {
+  const session = useSession();
+  return <CVScoreResultScreen {...props} session={session!} />;
 };
 
 const ScoreHistoryScreenWrapper = (props: any) => {
@@ -199,7 +216,7 @@ const HomeTabScreen = () => {
         contentStyle: {backgroundColor: colors.bgDark},
       }}>
       <HomeStack.Screen name="DashboardMain" component={DashboardScreenWrapper} />
-      <HomeStack.Screen name="CVScoreResult" component={CVScoreResultScreen} />
+      <HomeStack.Screen name="CVScoreResult" component={CVScoreResultScreenWrapper} />
       <HomeStack.Screen name="InterviewSetup" component={InterviewSetupScreen} />
       <HomeStack.Screen name="InterviewRecording" component={InterviewRecordingScreenWrapper} />
       <HomeStack.Screen name="InterviewResult" component={InterviewResultScreen} />
@@ -227,7 +244,7 @@ const AnalyzeTabScreen = () => {
         contentStyle: {backgroundColor: colors.bgDark},
       }}>
       <AnalyzeStack.Screen name="CVUploadMain" component={CVUploadScreenWrapper} />
-      <AnalyzeStack.Screen name="CVScoreResult" component={CVScoreResultScreen} />
+      <AnalyzeStack.Screen name="CVScoreResult" component={CVScoreResultScreenWrapper} />
       <AnalyzeStack.Screen name="InterviewSetup" component={InterviewSetupScreen} />
       <AnalyzeStack.Screen name="InterviewRecording" component={InterviewRecordingScreenWrapper} />
       <AnalyzeStack.Screen name="InterviewResult" component={InterviewResultScreen} />
@@ -255,7 +272,7 @@ const HistoryTabScreen = () => {
         contentStyle: {backgroundColor: colors.bgDark},
       }}>
       <HistoryStack.Screen name="ScoreHistoryMain" component={ScoreHistoryScreenWrapper} />
-      <HistoryStack.Screen name="CVScoreResult" component={CVScoreResultScreen} />
+      <HistoryStack.Screen name="CVScoreResult" component={CVScoreResultScreenWrapper} />
     </HistoryStack.Navigator>
   );
 };

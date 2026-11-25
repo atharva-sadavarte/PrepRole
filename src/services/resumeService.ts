@@ -1,9 +1,144 @@
 import {Linking, Alert} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {supabase} from '../lib/supabase';
-import {CVAnalysisResult, ResumeAnalysisRecord} from '../types/resume';
+import {
+  CVAnalysisResult,
+  ResumeAnalysisRecord,
+  GeneratedUpdatedPdfInfo,
+} from '../types/resume';
+import {copyPdfUriToCache, downloadPdfToCache} from './pdfService';
+
+const UPDATED_PDF_CACHE_PREFIX = '@preprole_updated_pdf_';
+const ORIG_PDF_LOCAL_PREFIX = '@preprole_orig_pdf_local_';
 
 const sleep = (ms: number) =>
   new Promise(resolve => setTimeout(() => resolve(undefined), ms));
+
+export function isPdfAnalysis(analysis: Partial<CVAnalysisResult>): boolean {
+  const name = (analysis.file_name || '').toLowerCase();
+  const url = (analysis.file_url || '').toLowerCase();
+  return name.endsWith('.pdf') || url.endsWith('.pdf');
+}
+
+export async function cacheOriginalLocalPdfUri(
+  analysisId: string,
+  sourceUri: string,
+  fileName: string,
+): Promise<string | null> {
+  try {
+    const cachedUri = await copyPdfUriToCache(
+      sourceUri,
+      `orig_${analysisId}_${fileName || 'resume.pdf'}`,
+    );
+    await AsyncStorage.setItem(
+      `${ORIG_PDF_LOCAL_PREFIX}${analysisId}`,
+      cachedUri,
+    );
+    return cachedUri;
+  } catch {
+    return null;
+  }
+}
+
+export async function getCachedUpdatedPdfInfo(
+  analysisId: string,
+): Promise<GeneratedUpdatedPdfInfo | null> {
+  try {
+    const raw = await AsyncStorage.getItem(`${UPDATED_PDF_CACHE_PREFIX}${analysisId}`);
+    if (!raw) return null;
+    return JSON.parse(raw) as GeneratedUpdatedPdfInfo;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveCachedUpdatedPdfInfo(
+  analysisId: string,
+  info: GeneratedUpdatedPdfInfo,
+): Promise<void> {
+  try {
+    await AsyncStorage.setItem(
+      `${UPDATED_PDF_CACHE_PREFIX}${analysisId}`,
+      JSON.stringify(info),
+    );
+  } catch {
+    // non-fatal
+  }
+}
+
+/**
+ * Ensures a local readable file:// URI exists for either original or updated PDF
+ */
+export async function ensureLocalPdfUri(
+  analysisId: string,
+  storagePathOrUrl?: string | null,
+  preferredLocalUri?: string | null,
+  cacheTag: 'orig' | 'updated' = 'orig',
+  displayFileName?: string | null,
+): Promise<string> {
+  if (preferredLocalUri) {
+    try {
+      const resp = await fetch(preferredLocalUri);
+      if (resp.ok) {
+        return preferredLocalUri;
+      }
+    } catch {
+      // Fall through to cached or remote download
+    }
+  }
+
+  if (cacheTag === 'orig') {
+    try {
+      const storedOrig = await AsyncStorage.getItem(
+        `${ORIG_PDF_LOCAL_PREFIX}${analysisId}`,
+      );
+      if (storedOrig) {
+        const resp = await fetch(storedOrig);
+        if (resp.ok) return storedOrig;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!storagePathOrUrl) {
+    throw new Error('No uploaded PDF found for this resume scan.');
+  }
+
+  let downloadUrl = storagePathOrUrl;
+  if (
+    !storagePathOrUrl.startsWith('http://') &&
+    !storagePathOrUrl.startsWith('https://')
+  ) {
+    const signed = await getResumeSignedUrl(storagePathOrUrl);
+    if (!signed) {
+      throw new Error(
+        'Could not retrieve the original PDF from storage. Please check your connection.',
+      );
+    }
+    downloadUrl = signed;
+  }
+
+  const cleanName = (displayFileName || 'resume.pdf').replace(
+    /[^a-zA-Z0-9._-]/g,
+    '_',
+  );
+  const localUri = await downloadPdfToCache(
+    downloadUrl,
+    `${cacheTag}_${analysisId}_${cleanName}`,
+  );
+  if (cacheTag === 'orig') {
+    try {
+      await AsyncStorage.setItem(
+        `${ORIG_PDF_LOCAL_PREFIX}${analysisId}`,
+        localUri,
+      );
+    } catch {
+      // ignore
+    }
+  }
+  return localUri;
+}
 
 /**
  * Saves a CV analysis to Supabase
@@ -45,6 +180,36 @@ export async function saveAnalysis(
 }
 
 /**
+ * Updates an analysis record with the newly generated updated PDF metadata
+ * (also persists in local AsyncStorage cache as fallback if DB migration hasn't run yet)
+ */
+export async function saveUpdatedPdfRecord(
+  analysisId: string,
+  info: GeneratedUpdatedPdfInfo,
+): Promise<void> {
+  await saveCachedUpdatedPdfInfo(analysisId, info);
+
+  try {
+    const {error} = await supabase
+      .from('resume_analyses')
+      .update({
+        updated_file_name: info.fileName,
+        updated_file_url: info.storagePath || null,
+        updated_summary_of_changes: info.changesSummary,
+        updated_at: info.generatedAt,
+      })
+      .eq('id', analysisId);
+
+    if (error) {
+      // Non-fatal if migration not yet applied remotely; local cache preserves state
+      console.warn('Could not sync updated PDF metadata to DB:', error.message);
+    }
+  } catch (err: any) {
+    console.warn('Updated PDF DB sync warning:', err?.message || err);
+  }
+}
+
+/**
  * Fetches all past CV analyses for the current user (with auto-retry for clock skew)
  */
 export async function getUserAnalyses(
@@ -71,7 +236,25 @@ export async function getUserAnalyses(
     return [];
   }
 
-  return (data as ResumeAnalysisRecord[]) || [];
+  const records = (data as ResumeAnalysisRecord[]) || [];
+  // Merge locally cached updated PDF info if DB columns aren't populated yet
+  return Promise.all(
+    records.map(async rec => {
+      if (rec.updated_file_url) return rec;
+      const cached = await getCachedUpdatedPdfInfo(rec.id);
+      if (!cached) return rec;
+      return {
+        ...rec,
+        updated_file_name: rec.updated_file_name || cached.fileName,
+        updated_file_url: rec.updated_file_url || cached.storagePath || null,
+        updated_summary_of_changes:
+          rec.updated_summary_of_changes && rec.updated_summary_of_changes.length > 0
+            ? rec.updated_summary_of_changes
+            : cached.changesSummary,
+        updated_at: rec.updated_at || cached.generatedAt,
+      };
+    }),
+  );
 }
 
 /**
@@ -106,6 +289,13 @@ export async function deleteAnalysis(id: string): Promise<boolean> {
   if (error) {
     console.error('Error deleting analysis:', error);
     return false;
+  }
+
+  try {
+    await AsyncStorage.removeItem(`${UPDATED_PDF_CACHE_PREFIX}${id}`);
+    await AsyncStorage.removeItem(`${ORIG_PDF_LOCAL_PREFIX}${id}`);
+  } catch {
+    // ignore
   }
 
   return true;
